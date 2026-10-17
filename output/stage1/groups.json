@@ -1,0 +1,339 @@
+{
+ "aircraft": {
+  "type": "A320-200（ACAP 量级，教学简化）",
+  "length": 37.57,
+  "wingspan": 34.1,
+  "mac": 4.1935,
+  "lemac": 16.92,
+  "oew": 42500.0,
+  "oew_station": 17.968375,
+  "oew_mac_pct": 25.0,
+  "mtow": 78000.0,
+  "mzfw": 62500.0,
+  "mlw": 66000.0,
+  "pax_max": 186,
+  "envelope": [
+   18.0,
+   36.0
+  ],
+  "y_limit": 0.35,
+  "fuel_imb_limit": 800.0,
+  "pax_std_w": 84.0,
+  "bag_std_w": 12.0,
+  "nose_x": 18.785,
+  "wheelbase": 12.64,
+  "main_track": 7.59,
+  "mg_station": 19.189845000000002,
+  "ng_station": 6.549845000000001,
+  "nose_load_max": 0.15
+ },
+ "zones": {
+  "FWD": {
+   "label": "前舱",
+   "station": 11.2,
+   "rows": [
+    1,
+    12
+   ],
+   "row0_st": 8.6,
+   "seats_full": 72,
+   "max": 60,
+   "y": 0.02
+  },
+  "MID": {
+   "label": "中舱",
+   "station": 18.5,
+   "rows": [
+    13,
+    20
+   ],
+   "row0_st": 17.0,
+   "seats_full": 48,
+   "max": 70,
+   "y": -0.01
+  },
+  "AFT": {
+   "label": "后舱",
+   "station": 25.8,
+   "rows": [
+    21,
+    31
+   ],
+   "row0_st": 23.2,
+   "seats_full": 66,
+   "max": 50,
+   "y": 0.03
+  }
+ },
+ "cargo": {
+  "FWD": {
+   "label": "前货舱",
+   "station": 12.8,
+   "max": 3175.0,
+   "y": 0.1
+  },
+  "AFT": {
+   "label": "后货舱",
+   "station": 24.6,
+   "max": 4480.0,
+   "y": -0.08
+  },
+  "BULK": {
+   "label": "散装舱",
+   "station": 28.8,
+   "max": 1495.0,
+   "y": 0.05
+  }
+ },
+ "fuel": {
+  "WING_L": {
+   "label": "左翼油",
+   "station": 18.2,
+   "max": 7500.0,
+   "y": -5.5
+  },
+  "WING_R": {
+   "label": "右翼油",
+   "station": 18.2,
+   "max": 7500.0,
+   "y": 5.5
+  },
+  "CTR": {
+   "label": "中央油箱",
+   "station": 18.5,
+   "max": 6145.0,
+   "y": 0.0
+  }
+ },
+ "init": {
+  "pax": {
+   "FWD": 40,
+   "MID": 60,
+   "AFT": 35
+  },
+  "cargo": {
+   "FWD": 1800,
+   "AFT": 2200,
+   "BULK": 400
+  },
+  "fuel": {
+   "WING_L": 4200,
+   "WING_R": 4300,
+   "CTR": 3500
+  }
+ },
+ "groups": {
+  "PAX_0A": {
+   "label": "前舱座椅 0A",
+   "kind": "payload",
+   "note": "0A 区（排 1-12）。旅客是**站位靠前**的业载，加满会把 CG 往前拉。",
+   "station": 11.2,
+   "zone": "FWD",
+   "rows": "1-12",
+   "capacity": 72,
+   "unit_kg": 84.0
+  },
+  "PAX_0B": {
+   "label": "中舱座椅 0B",
+   "kind": "payload",
+   "note": "0B 区（排 13-20）。位于重心附近，对 CG 影响最小 —— 所以调载常拿它做微调。",
+   "station": 18.5,
+   "zone": "MID",
+   "rows": "13-20",
+   "capacity": 48,
+   "unit_kg": 84.0
+  },
+  "PAX_0C": {
+   "label": "后舱座椅 0C",
+   "kind": "payload",
+   "note": "0C 区（排 21-31）。后舱加满会把 CG 明显往后拉，是「后重」工况的主因。",
+   "station": 25.8,
+   "zone": "AFT",
+   "rows": "21-31",
+   "capacity": 66,
+   "unit_kg": 84.0
+  },
+  "BAG_1": {
+   "label": "行李（1 舱）",
+   "kind": "payload",
+   "note": "前舱旅客的托运行李，随前货舱装载。行李重量按 12 kg/人计。",
+   "station": 12.8,
+   "zone": "FWD",
+   "unit_kg": 12.0,
+   "capacity": 72
+  },
+  "BAG_3": {
+   "label": "行李（3 舱）",
+   "kind": "payload",
+   "note": "后舱旅客的托运行李，随后货舱装载。",
+   "station": 24.6,
+   "zone": "AFT",
+   "unit_kg": 12.0,
+   "capacity": 66
+  },
+  "CARGO_1": {
+   "label": "1 舱 前货舱",
+   "kind": "payload",
+   "note": "位于主翼前，限重最紧，装重货会把 CG 前拉。",
+   "station": 12.8,
+   "hold": "FWD",
+   "limit_kg": 3175.0
+  },
+  "CARGO_3": {
+   "label": "3 舱 后货舱",
+   "kind": "payload",
+   "note": "后货舱前半段，容积大，是压舱调载的首选位。",
+   "station": 24.6,
+   "hold": "AFT",
+   "limit_kg": 4480.0
+  },
+  "CARGO_5": {
+   "label": "5 舱 散货舱",
+   "kind": "payload",
+   "note": "散货舱（LDM 记 5H），位置最靠后，装载对 CG 影响最敏感。",
+   "station": 28.8,
+   "hold": "BULK",
+   "limit_kg": 1495.0
+  },
+  "FUEL_WING_L": {
+   "label": "左翼油箱",
+   "kind": "system",
+   "note": "左/右翼油差直接造成**横向不平衡**，是横滚配平的主因。",
+   "station": 18.2,
+   "limit_kg": 7500.0,
+   "y": -5.5
+  },
+  "FUEL_WING_R": {
+   "label": "右翼油箱",
+   "kind": "system",
+   "note": "左右翼油差超过限值需按燃油不平衡程序处理。",
+   "station": 18.2,
+   "limit_kg": 7500.0,
+   "y": 5.5
+  },
+  "FUEL_CTR": {
+   "label": "中央油箱",
+   "kind": "system",
+   "note": "位置贴近重心，加注几乎不改变 %MAC，但计入 TOW —— 是「先加中央油」的依据。",
+   "station": 18.5,
+   "limit_kg": 6145.0,
+   "y": 0.0
+  },
+  "HULL_UPPER": {
+   "label": "机身壳体",
+   "kind": "structure",
+   "note": "机身结构本体，属 OEW，不随装载变化。"
+  },
+  "FLOOR_CABIN": {
+   "label": "客舱地板",
+   "kind": "structure",
+   "note": "客舱与货舱的分界，也是客舱载荷的承力面。"
+  },
+  "FLOOR_CARGO": {
+   "label": "货舱地板",
+   "kind": "structure",
+   "note": "货舱承力面。"
+  },
+  "BELLY_FAIRING": {
+   "label": "翼身整流罩",
+   "kind": "structure",
+   "note": "主翼与机身交接处的整流结构，属 OEW。"
+  },
+  "WING_L": {
+   "label": "左机翼",
+   "kind": "structure",
+   "note": "含翼尖小翼。翼内为油箱，属结构 + 系统。"
+  },
+  "WING_R": {
+   "label": "右机翼",
+   "kind": "structure",
+   "note": "含翼尖小翼。"
+  },
+  "ENG_L": {
+   "label": "左发动机与吊挂",
+   "kind": "system",
+   "note": "计入 OEW。吊挂位置对 CG 有小幅影响。"
+  },
+  "ENG_R": {
+   "label": "右发动机与吊挂",
+   "kind": "system",
+   "note": "计入 OEW。"
+  },
+  "TAIL_HS": {
+   "label": "水平尾翼",
+   "kind": "structure",
+   "note": "提供俯仰配平力矩，配平值以 STAB TRIM 给出。"
+  },
+  "TAIL_VS": {
+   "label": "垂直尾翼",
+   "kind": "structure",
+   "note": "提供偏航稳定性，属 OEW。"
+  },
+  "DOORS": {
+   "label": "舱门",
+   "kind": "structure",
+   "note": "客/货舱门，属 OEW。装卸作业的通道。"
+  },
+  "WINDOWS": {
+   "label": "舷窗",
+   "kind": "structure",
+   "note": "属 OEW。"
+  },
+  "MARKINGS": {
+   "label": "机身标识",
+   "kind": "structure",
+   "note": "属 OEW。"
+  },
+  "GEAR_N": {
+   "label": "前起落架",
+   "kind": "system",
+   "note": "属 OEW。地面停放由三点式起落架支撑。"
+  },
+  "GEAR_ML": {
+   "label": "左主起落架",
+   "kind": "system",
+   "note": "属 OEW。"
+  },
+  "GEAR_MR": {
+   "label": "右主起落架",
+   "kind": "system",
+   "note": "属 OEW。"
+  },
+  "GEAR_WHEEL": {
+   "label": "机轮",
+   "kind": "system",
+   "note": "属 OEW。"
+  },
+  "ANNO_CG": {
+   "label": "CG 标记",
+   "kind": "annotation",
+   "note": "重心标记，非实体。"
+  },
+  "ANNO_SCALE": {
+   "label": "标尺",
+   "kind": "annotation",
+   "note": "MAC / 站位标尺，非实体。"
+  },
+  "ANNO_UI": {
+   "label": "界面标注",
+   "kind": "annotation",
+   "note": "界面元素，非实体。"
+  },
+  "ANNO_TEXT": {
+   "label": "文字标注",
+   "kind": "annotation",
+   "note": "文字层，非实体。"
+  },
+  "ANNO_LABEL": {
+   "label": "部件名称",
+   "kind": "annotation",
+   "note": "部件名称标签。"
+  },
+  "ENV_GROUND": {
+   "label": "地面",
+   "kind": "env",
+   "note": "环境地面，非实体。"
+  }
+ },
+ "note": "由 scripts/a320_data.py 自动导出，请勿手工编辑；站位 Arm 自机头 DATUM 向后量（m），%MAC = (CG − LEMAC)/MAC × 100。"
+}

@@ -1,0 +1,3319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>配载教学 · 三维拆解验证（Stage 1b）</title>
+<style>
+  /* 配色令牌与 output/配载平衡交互教学.html 保持一致，两页视觉同源 */
+  :root {
+    --bg: #e8ebee;
+    --panel: #f7f8fa;
+    --panel-2: #ffffff;
+    --line: #c5ccd4;
+    --line-soft: #dce2e8;
+    --text: #1a2330;
+    --text-dim: #4a5568;
+    --text-faint: #6b7788;
+    --steel: #2f6f9f;
+    --steel-bright: #1a5580;
+    --steel-bg: #eaf2f9;
+    --green: #1f8a4c;
+    --amber: #b07800;
+    --red: #c0392b;
+    --font: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --mono: "Cascadia Code", "Consolas", "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden;
+    font-family: var(--font); background: var(--bg); color: var(--text); }
+  #app { display: flex; height: 100%; }
+  #stage { position: relative; flex: 1; min-width: 0; }
+  #stage canvas { display: block; }
+  /* ── 统一信息面板 ──────────────────────────────────────────────────
+     原三块白板（运行状态 / 操作方式 / 部件信息）各自独立浮在三维视图上，
+     既分散又挡视线。合并为一个可折叠面板：
+       · 展开：左上角一栏，三段分区，仍只占 244 px 宽
+       · 收起：只剩左上角一枚小胶囊，**完全不遮挡飞机演示视角**
+     三段仍保留原 id（hud / legend / card），所有既有 JS 不用改。 */
+  #infobar { position: absolute; left: 12px; top: 12px; width: 244px;
+    background: rgba(255,255,255,.93); border: 1px solid var(--line); border-radius: 8px;
+    font-size: 12px; box-shadow: 0 1px 4px rgba(24,60,95,.10); }
+  #infobar.collapsed { width: auto; }
+  #infobar.collapsed #infobody { display: none; }
+  #infohead { display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+    border-bottom: 1px solid var(--line-soft); }
+  #infobar.collapsed #infohead { border-bottom: none; }
+  #infohead .t { font-weight: 700; font-size: 11px; letter-spacing: .06em;
+    color: var(--steel-bright); }
+  #infohead .sp { flex: 1; }
+  #infotog { font-size: 11px; padding: 2px 8px; border-radius: 4px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--text-dim); }
+  #infotog:hover { border-color: var(--steel); color: var(--steel-bright); }
+  #infobody { max-height: calc(100vh - 140px); overflow-y: auto; }
+  #infobody .sec { padding: 8px 10px; border-top: 1px solid var(--line-soft); }
+  #infobody .sec:first-child { border-top: none; }
+  #infobody .st { font-size: 10px; font-weight: 700; letter-spacing: .08em;
+    color: var(--text-faint); margin-bottom: 4px; }
+  #hud { font-family: var(--mono); font-size: 12px; line-height: 1.7; }
+  #hud b { font-weight: 700; }
+  #hud .k { color: var(--text-faint); }
+  #hud .v { color: var(--steel-bright); font-variant-numeric: tabular-nums; }
+  #legend { font-size: 11px; line-height: 1.6; color: var(--text-faint); }
+  #panel { width: 272px; flex: none; background: var(--panel); border-left: 1px solid var(--line);
+    overflow-y: auto; padding: 14px; }
+  h1 { font-family: var(--mono); font-size: 14px; font-weight: 700; margin: 0 0 4px;
+    letter-spacing: .04em; color: var(--steel-bright); }
+  .sub { font-size: 11px; color: var(--text-faint); margin-bottom: 14px; line-height: 1.6; }
+  h2 { font-size: 12px; font-weight: 700; margin: 16px 0 8px; color: var(--steel);
+    padding-bottom: 5px; border-bottom: 1px solid var(--line-soft);
+    letter-spacing: .08em; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 7px 0; font-size: 12px; }
+  .row label { flex: 1; color: var(--text-dim); }
+  .row .num { width: 44px; text-align: right; color: var(--steel-bright);
+    font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: var(--steel); }
+  button { font-family: var(--font); font-size: 11px; padding: 5px 9px; border-radius: 4px;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--text-dim);
+    cursor: pointer; }
+  button:hover { background: var(--steel-bg); border-color: var(--steel); }
+  button.on { background: var(--steel-bg); border-color: var(--steel-bright);
+    color: var(--steel-bright); font-weight: 700; }
+  .btns { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+  .grp { display: flex; align-items: center; gap: 6px; font-size: 11px;
+    padding: 3px 4px; border-radius: 4px; }
+  .grp:hover { background: var(--steel-bg); }
+  .grp .dot { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+  .grp .nm { flex: 1; color: var(--text-dim); font-family: var(--mono); }
+  .grp .ct { color: var(--text-faint); font-family: var(--mono);
+    font-variant-numeric: tabular-nums; }
+  .grp input { accent-color: var(--steel); }
+  #err { position: absolute; inset: 0; display: none; place-items: center;
+    background: var(--bg); padding: 40px; }
+  #err div { max-width: 560px; font-size: 13px; line-height: 1.9; }
+  #err code { background: #e3e9f0; padding: 1px 5px; border-radius: 3px;
+    font-family: var(--mono); }
+  #loading { position: absolute; inset: 0; display: grid; place-items: center;
+    background: var(--bg); font-size: 13px; color: var(--text-faint); }
+  /* 事故卡：坠机时居中弹出，写清是哪几项配载越界 + 一键复位 */
+  #crash { position: absolute; inset: 0; display: none; place-items: center;
+    background: rgba(20,32,46,.42); }
+  #crash.on { display: grid; }
+  #crash .box { width: 420px; background: #fff; border: 1px solid var(--line);
+    border-top: 4px solid #a8443a; border-radius: 10px; padding: 16px 18px;
+    box-shadow: 0 8px 28px rgba(20,40,66,.28); font-size: 12px; line-height: 1.7; }
+  #crash .t { font-size: 14px; font-weight: 700; color: #a8443a; margin-bottom: 8px;
+    letter-spacing: .04em; }
+  #crash b { color: var(--steel-bright); font-variant-numeric: tabular-nums; }
+  #crash ul { margin: 6px 0 10px; padding-left: 18px; color: var(--text-dim); }
+  #crashreset { margin-top: 4px; padding: 6px 14px; border-radius: 5px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--text-dim);
+    font-size: 12px; }
+  #crashreset:hover { border-color: var(--steel); color: var(--steel-bright); }
+  /* 场景面板（第 4 项）：默认只显示场景按钮，点选后才展开该场景专属参数组 */
+  .scenepanel { display: none; }
+  .scenepanel.on { display: block; }
+  #scenes button { font-weight: 600; }
+  #sceneHint { font-weight: 700; color: var(--steel-bright); }
+  /* 预设参数卡：点预设后在当前场景面板顶部弹出，几秒后自动收起 */
+  .presetcard { display: none; margin: 0 0 10px; padding: 8px 10px;
+    font-size: 11px; line-height: 1.75; background: var(--panel-2);
+    border: 1px solid var(--line); border-left: 3px solid var(--steel);
+    border-radius: 6px; }
+  .presetcard.on { display: block; }
+  .presetcard .pt { font-weight: 700; color: var(--steel-bright); margin-bottom: 4px; }
+  .presetcard b { color: var(--steel-bright); font-variant-numeric: tabular-nums; }
+  /* 飞行状态标签 */
+  #fstate { font-family: var(--mono); }
+  #fstate.warn { color: #b07a20; font-weight: 700; }
+  #fstate.unstable { color: #a8443a; font-weight: 700; }
+  #fstate.cruise { color: var(--steel-bright); }
+  /* 点击信息卡：浮在三维区左下 */
+  #card { font-size: 12px; line-height: 1.65; }
+  #card .ct { font-weight: 700; color: var(--steel-bright); margin-bottom: 4px;
+    font-size: 13px; }
+  #card .cb { color: var(--text-dim); }
+  #card .cb b { color: var(--steel-bright); font-variant-numeric: tabular-nums; }
+  #card .tag { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 3px;
+    background: var(--steel-bg); color: var(--steel-bright); margin-left: 6px; }
+  /* KPI 网格 */
+  #kpi { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 6px 0 8px; }
+  #kpi .k { display: flex; justify-content: space-between; align-items: baseline;
+    background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 4px;
+    padding: 4px 7px; font-size: 11px; }
+  #kpi .k span { color: var(--text-faint); }
+  #kpi .k b { font-family: var(--mono); font-variant-numeric: tabular-nums;
+    color: var(--steel-bright); }
+  #kpi .k.bad { border-color: var(--red); background: var(--red-bg); }
+  #kpi .k.bad b { color: var(--red); }
+  #kpi .k.warn { border-color: var(--amber); background: var(--amber-bg); }
+  #kpi .k.warn b { color: var(--amber); }
+  /* 载重滑块 */
+  #loadpanel .lgrp { margin: 0 0 2px; font-size: 11px; color: var(--text-faint);
+    letter-spacing: .06em; }
+  #loadpanel .lrow { display: flex; align-items: center; gap: 6px; margin: 3px 0; font-size: 11px; }
+  #loadpanel .lrow label { flex: 1; color: var(--text-dim); }
+  #loadpanel .lrow input[type=range] { width: 96px; }
+  #loadpanel .lrow .v { width: 46px; text-align: right; font-family: var(--mono);
+    color: var(--steel-bright); font-variant-numeric: tabular-nums; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/build/three.module.js",
+    "three/addons/": "./vendor/three/examples/jsm/",
+    "three-mesh-bvh": "./vendor/npm/node_modules/three-mesh-bvh/src/index.js",
+    "camera-controls": "./vendor/npm/node_modules/camera-controls/dist/camera-controls.module.js",
+    "troika-three-text": "./vendor/npm/node_modules/troika-three-text/dist/troika-three-text.esm.js",
+    "troika-three-utils": "./vendor/npm/node_modules/troika-three-utils/dist/troika-three-utils.esm.js",
+    "troika-worker-utils": "./vendor/npm/node_modules/troika-worker-utils/dist/troika-worker-utils.esm.js",
+    "webgl-sdf-generator": "./vendor/npm/node_modules/webgl-sdf-generator/dist/webgl-sdf-generator.mjs",
+    "bidi-js": "./vendor/npm/node_modules/bidi-js/dist/bidi.mjs"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <div id="infobar">
+      <div id="infohead">
+        <span class="t">信息面板</span><span class="sp"></span>
+        <button id="infotog" title="折叠 / 展开（收起后不遮挡飞机）">收起</button>
+      </div>
+      <div id="infobody">
+        <div class="sec">
+          <div class="st">运行状态</div>
+          <div id="hud">
+            <div><span class="k">draw call</span> <span class="v" id="h_calls">–</span></div>
+            <div><span class="k">三角面</span> <span class="v" id="h_tris">–</span></div>
+            <div><span class="k">实例化网格</span> <span class="v" id="h_inst">–</span></div>
+            <div><span class="k">FPS</span> <span class="v" id="h_fps">–</span></div>
+            <div><span class="k">拆解进度</span> <span class="v" id="h_t">0%</span></div>
+            <div><span class="k">波次</span> <span class="v" id="h_wave">组装态</span></div>
+            <div style="margin-top:6px;border-top:1px solid var(--line-soft);padding-top:6px">
+              <span class="k">自检</span> <span class="v" id="h_diag">加载中…</span>
+            </div>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="st">操作方式</div>
+          <div id="legend">
+            拖拽旋转 · 滚轮缩放 · 右键平移 · <b>左键点击部件查看数据</b><br>
+            机体长轴 = X（机头 +X）· 高度 = Y · 展向 = Z
+          </div>
+        </div>
+        <div class="sec">
+          <div class="st">部件信息</div>
+          <div id="card">
+            <div class="ct">点击机体任意部件查看</div>
+            <div class="cb">左键点击三维视图中的部件 → 显示名称、类别、站位与当前装载下的力矩贡献。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="loading">正在加载模型…</div>
+    <div id="err"><div></div></div>
+    <div id="crash">
+      <div class="box">
+        <div class="t" id="crashtitle">飞行事故 · 配载越界</div>
+        <div id="crashbody"></div>
+        <button id="crashreset">复位配载</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="panel">
+    <h1>三维拆解验证</h1>
+    <div class="sub">Stage 1b · 读 <code>teach_model.glb</code>（Draco）+ <code>labels.json</code><br>
+      拆解组、波次、方向全部来自 GLB 内 extras，视图侧无硬编码。</div>
+
+    <h2>场景</h2>
+    <div class="btns" id="scenes">
+      <button data-scene="park" class="on">静态停泊</button>
+      <button data-scene="air">空中飞行</button>
+      <button data-scene="strip">拆解演示</button>
+    </div>
+    <div id="sceneHint" class="sub" style="margin:6px 0 2px">当前生效参数组：—</div>
+
+    <!-- ── 场景一：静态停泊（无子场景，直接展示一组参数）───────────────── -->
+    <div class="scenepanel on" data-panel="park">
+      <h2>配载参数</h2>
+      <div class="sub" style="margin:0 0 8px">
+        调整客 / 货 / 油 → 重心沿机身移动。<br>
+        <b>重心越过主轮 → 尾坐（机头翘起）</b>；<b>重心过度靠前 → 前轮过载折断、机头砸在机坪上</b>。
+      </div>
+      <div id="kpi">
+        <div class="k" id="k_tow"><span>TOW</span><b>–</b></div>
+        <div class="k" id="k_zfw"><span>ZFW</span><b>–</b></div>
+        <div class="k" id="k_mac"><span>%MAC</span><b>–</b></div>
+        <div class="k" id="k_y"><span>横向 y</span><b>–</b></div>
+        <div class="k" id="k_imb"><span>油差</span><b>–</b></div>
+        <div class="k" id="k_att"><span>姿态</span><b>–</b></div>
+      </div>
+      <div id="loadpanel"></div>
+      <div class="btns">
+        <button data-p="normal" class="on">正常</button>
+        <button data-p="fwd">前重 · 触发机头砸地</button>
+        <button data-p="aft">后重 · 触发尾坐</button>
+        <button data-p="left">左重</button>
+        <button data-p="right">右重</button>
+      </div>
+
+      <h2>视角</h2>
+      <div class="btns" id="views">
+        <button data-v="home">全景</button>
+        <button data-v="side">侧视</button>
+        <button data-v="top">俯视</button>
+        <button data-v="nose">机头</button>
+        <button data-v="cargo">货舱</button>
+        <button data-v="cabin">客舱</button>
+      </div>
+      <div style="font-size:11px;color:#93a2b1;line-height:1.6;margin-top:4px">
+        侧视最容易看清尾坐与机头砸地。
+      </div>
+
+      <h2>剖视</h2>
+      <div class="btns">
+        <button id="cutPark">剖开左半壳</button>
+      </div>
+      <div style="font-size:11px;color:#93a2b1;line-height:1.6;margin-top:4px">
+        默认完整机身。剖掉左半壳可看客舱/货舱布局，再点一次恢复。
+      </div>
+    </div>
+
+    <!-- ── 场景二：空中飞行 ──────────────────────────────────────────── -->
+    <div class="scenepanel" data-panel="air">
+      <h2>飞行工况</h2>
+      <div class="sub" style="margin:0 0 8px">调出极端工况 → 姿态发散 → 坠机，
+        事故卡会写清是哪项配载越界导致的。</div>
+      <div class="btns">
+        <button data-f="normal">正常巡航</button>
+        <button data-f="fwdlim">前限 18%</button>
+        <button data-f="aftlim">后限 36%</button>
+        <button data-f="aftx">严重后重</button>
+        <button data-f="fwdlimx">严重前重</button>
+        <button data-f="lat">严重横偏</button>
+        <button data-f="over">超载</button>
+        <button data-f="slow">低速</button>
+      </div>
+      <div class="row"><label>空速 km/h</label>
+        <input type="range" id="f_spd" min="200" max="580" step="10" value="460">
+        <span class="num" id="f_spdv">460</span></div>
+      <div class="row"><label>左右油量差 kg</label>
+        <input type="range" id="f_imb" min="0" max="3200" step="50" value="100">
+        <span class="num" id="f_imbv">100</span></div>
+      <div class="row"><label>允许坠机</label>
+        <input type="checkbox" id="f_allow" checked style="width:auto"></div>
+      <div id="fstate" class="sub" style="margin:6px 0 0">状态：—</div>
+    </div>
+
+    <!-- ── 场景三：拆解演示 ──────────────────────────────────────────── -->
+    <div class="scenepanel" data-panel="strip">
+    <h2>分层拆解</h2>
+    <input type="range" id="t" min="0" max="100" value="0">
+    <div class="row"><label>拆解进度</label><span class="num" id="tv">0</span></div>
+    <div class="btns">
+      <button data-t="0">组装</button>
+      <button data-t="20">下部分离</button>
+      <button data-t="44">客舱分离</button>
+      <button data-t="60">上壳掀起</button>
+      <button data-t="100">全拆</button>
+      <button id="auto">自动播放</button>
+    </div>
+
+    <h2>波次显隐</h2>
+    <div class="btns" id="layers"></div>
+
+    <h2>剖切</h2>
+    <div class="row"><label>剖切面（沿机身）</label><span class="num" id="cv">关</span></div>
+    <input type="range" id="clip" min="0" max="100" value="0">
+
+    <h2>剖视 · 第一段</h2>
+    <div class="btns">
+      <button id="cut">剖开左半壳</button>
+      <button id="s1">① 只剖视</button>
+      <button id="s2">② 再抽出</button>
+    </div>
+    <div style="font-size:11px;color:#6b7788;line-height:1.6;margin:4px 0 2px">
+      机身不拆 → 客舱封闭 → 看不见内部。先把壳体左半剖掉露出客/货舱，
+      再由「分层拆解」把载荷沿剖口抽出。只对壳体/门/窗生效，机翼不会被切。
+    </div>
+
+    <h2>拆解组</h2>
+    <div class="btns">
+      <button id="all">全选</button>
+      <button id="none">全不选</button>
+      <button id="solo">仅载荷</button>
+      <button id="anno">标注层</button>
+    </div>
+    <div id="groups"></div>
+
+    <h2>来源</h2>
+    <div class="btns" id="srclist"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────────────────────────────────
+   经典脚本（非 module）：module 被 CORS 拦截时它仍会执行，用来兜底诊断。
+   教训：如果诊断逻辑只写在 <script type="module"> 里，一旦模块本身加载失败，
+   页面就会永久停在「正在加载模型…」且毫无提示 —— 排查成本极高。
+   ───────────────────────────────────────────────────────────────────────── */
+(function () {
+  var boot = document.getElementById('loading');
+  var err = document.getElementById('err');
+
+  function show(html) {
+    if (window.__LB_OK) return;
+    boot.style.display = 'none';
+    err.style.display = 'grid';
+    err.firstElementChild.innerHTML = html;
+  }
+
+  function probe(url) {
+    return fetch(url, { cache: 'no-store' })
+      .then(function (r) { return { url: url, ok: r.ok, status: r.status }; })
+      .catch(function (e) { return { url: url, ok: false, status: 'ERR ' + e.message }; });
+  }
+
+  var FILE_HINT =
+    '<b>检测到用 file:// 打开本页，这是打不开模型的原因。</b><br><br>' +
+    '本页用 ES 模块加载 three.js、并用 fetch 读取 <code>teach_model.glb</code>。' +
+    '浏览器对 <code>file://</code> 下的模块与 fetch 一律按跨域拦截，所以脚本一行都不会执行，' +
+    '页面只会停留在「正在加载模型…」。<br><br>' +
+    '<b>三种解决办法，按省事程度排序：</b><br>' +
+    '<b>① 最省事：改开单文件版</b> —— 同级目录的 <code>..\\配载教学三维拆解.html</code>。' +
+    '它把 three.js 与模型全部内联，<b>双击即开，不需要本地服务、不需要联网</b>。<br>' +
+    '<b>② 双击本目录的 <code>启动预览.cmd</code></b>（不要用 .ps1，本机 .ps1 的文件关联被指向了应用商店程序，双击不会执行脚本）。' +
+    '该 cmd 会自动挑一个空闲端口、等服务起来后再开浏览器。<br>' +
+    '<b>③ 手工起服务</b>：<br>' +
+    '<code>&amp; "C:\\Users\\96258\\.workbuddy\\binaries\\python\\envs\\default\\Scripts\\python.exe" ' +
+    '-m http.server 8777 --bind 127.0.0.1 --directory "&lt;本目录&gt;"</code><br>' +
+    '然后访问 <code>http://127.0.0.1:8777/</code>。<br><br>' +
+    '注意：<b>不要</b>把本页拷到别处、或直接拖进浏览器打开。';
+
+  if (location.protocol === 'file:') { show(FILE_HINT); return; }
+
+  // 模块若因 404（例如 vendor\three 的 junction 失效）而加载失败，模块内所有代码都不会跑，
+  // 这里在 8 秒后做一次资源探测，直接指出是哪一个文件取不到。
+  setTimeout(function () {
+    if (window.__LB_OK || window.__LB_MODULE_STARTED) return;
+    Promise.all([
+      probe('./vendor/three/build/three.module.js'),
+      probe('./vendor/three/examples/jsm/loaders/DRACOLoader.js'),
+      probe('./teach_model.glb'),
+      probe('./labels.json')
+    ]).then(function (rs) {
+      var lines = rs.map(function (r) {
+        return (r.ok ? '　OK　 ' : '　失败 ')+ r.status + '　' + r.url;
+      }).join('<br>');
+      show('<b>三维模块未能启动</b><br><br>资源探测结果：<br><pre style="margin:8px 0;' +
+        'font-family:ui-monospace,Consolas,monospace">' + lines + '</pre>' +
+        '<b>按结果对症处理：</b><br>' +
+        '· <code>vendor/three/...</code> 失败 → three.js 没挂进来。' +
+        '本目录的 <code>vendor\\three</code> 是指向 <code>D:\\three.js</code> 的目录联接（junction），' +
+        '若已把网页拷贝到别处、或 D 盘那份被移动，链接即失效，需重建链接或做实体拷贝。<br>' +
+        '· <code>teach_model.glb</code> 失败 → 模型文件不在同级目录，或服务目录指错了。<br>' +
+        '· <code>labels.json</code> 失败 → 只是标注层缺失，不影响三维，可忽略。<br><br>' +
+        '若全部 OK 却仍停在此处，请按 F12 看 Console 的报错原文。');
+    });
+  }, 8000);
+})();
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+import CameraControls from 'camera-controls';
+import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
+
+window.__LB_MODULE_STARTED = true;
+
+// three-mesh-bvh：把 raycast 换成 BVH 加速版。当前 37k 顶点还用不上，
+// 但 Stage 2 几何升到 P1（≤200k 顶点）后，点选部件的帧耗时会差一个量级，先接上。
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
+CameraControls.install({ THREE });
+
+const $ = (id) => document.getElementById(id);
+const fail = (msg) => {
+  $('loading').style.display = 'none';
+  const box = $('err'); box.style.display = 'grid';
+  box.firstElementChild.innerHTML = msg;
+  console.error(msg);
+};
+
+// 逐步面包屑 + 全局异常捕获：课堂排障与无头自检都靠它定位
+let STEP = 'module-start';
+const mark = (s) => {
+  STEP = s;
+  const el = $('loading');
+  if (el && el.style.display !== 'none') el.textContent = '正在加载模型… [' + s + ']';
+};
+window.addEventListener('error', (ev) => fail(
+  '<b>运行期错误</b><br>' + ev.message + '<br><br>' +
+  '<code>' + (ev.filename || '') + ':' + (ev.lineno || '?') + '</code>'));
+window.addEventListener('unhandledrejection', (ev) => {
+  const r = ev.reason || {};
+  // 带上堆栈：只报 message 时根本定位不到是哪一步（已踩过一次，靠加堆栈才找到）
+  fail('<b>未处理的异步错误</b><br>' + (r.message || String(ev.reason)) +
+       '<br><pre style="font-size:11px;white-space:pre-wrap">' +
+       String(r.stack || '').slice(0, 900) + '</pre>');
+});
+setTimeout(() => {
+  if (STEP !== 'animating') {
+    fail('<b>加载超时</b><br>最后完成到：<code>' + STEP + '</code><br><br>' +
+      '常见原因：GLB 未取到（确认 <code>teach_model.glb</code> 在同目录）、' +
+      'Draco 解码器路径不对、或浏览器 WebGL 不可用。<br>' +
+      '若稍后自行恢复，本提示会自动消失。');
+  }
+}, 25000);
+
+// ── 契约 §二：Blender(x,y,z) → Three(x,z,-y) ────────────────────────────────
+const B2G = (v) => new THREE.Vector3(v[0], v[2], -v[1]);
+
+// ── 渲染基础（契约 §六：相机与灯光在视图侧重建）────────────────────────────
+const stage = $('stage');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+} catch (e) {
+  fail('<b>WebGL 初始化失败</b><br>' + e.message +
+    '<br><br>本页需要可用的 WebGL。请确认：<br>' +
+    '① 用 <code>启动三维预览.ps1</code> 起的本地服务打开，而不是双击文件；<br>' +
+    '② 浏览器未禁用硬件加速（<code>chrome://gpu</code> 可查 WebGL 状态）；<br>' +
+    '③ 若在远程桌面/虚拟机里，显卡驱动可能不支持 WebGL。');
+  throw e;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(stage.clientWidth, stage.clientHeight);
+renderer.localClippingEnabled = true;
+renderer.shadowMap.enabled = true;
+// r166 之后 PCFSoftShadowMap 被移除（r186 会告警并回落 PCFShadowMap）；
+// 新版 PCFShadowMap 已是改进的软阴影采样，直接显式使用。
+renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;          // 停泊基准；setMode('air') 时微提到 1.08
+stage.appendChild(renderer.domElement);
+mark('renderer-ok');
+
+const scene = new THREE.Scene();
+
+// ★ 不再用"半径 360 的穹顶球"：球体只有 32×20 段，地平线附近会出现
+//   **明显的多边形棱面**，而且贴图球化后在天顶处被挤压 —— 这就是"方块感"的来源。
+//   改用 `scene.background = 渐变贴图`：普通（UVMapping）贴图会被 three.js 按
+//   **屏幕空间**铺满并双线性插值，完全平滑、没有棱角，也不随相机产生透视畸变。
+//   同时把渐变级数提到 512 级，色带过渡更细腻。
+function makeSkyGradient(stops) {
+  const cv = document.createElement('canvas');
+  cv.width = 8; cv.height = 512;
+  const g = cv.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 0, 512);
+  for (const s of stops) grd.addColorStop(s[0], s[1]);
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 8, 512);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.minFilter = THREE.LinearFilter;
+  t.magFilter = THREE.LinearFilter;
+  t.wrapS = THREE.ClampToEdgeWrapping;
+  return t;
+}
+// 高空：天顶深蓝 → 中段 → 近地平线转亮（真实大气散射的观感）
+const SKY_AIR = makeSkyGradient([
+  [0.00, '#16395f'], [0.18, '#24507f'], [0.38, '#3f6f9d'],
+  [0.58, '#6f9cc0'], [0.76, '#a8c8dd'], [0.90, '#d8e6ef'],
+  [1.00, '#e6eff5'],
+]);
+// 停泊：淡蓝天 + 地平线微白霾，压低对比，突出机体与机坪
+const SKY_PARK = makeSkyGradient([
+  [0.00, '#6d9bca'], [0.30, '#8fb3d4'], [0.62, '#bcd2e4'],
+  [0.85, '#dde8f0'], [1.00, '#eaf1f5'],
+]);
+scene.background = SKY_PARK;
+scene.fog = new THREE.Fog(0xd8e1e9, 70, 240);            // 让地面网格自然淡出，避免硬边
+
+// ── 程序化天空 + 环境光照（批次2，取代 RoomEnvironment）────────────────────
+// 用 three addons 的 Sky（大气散射 shader：瑞利散射蓝天 + 米氏散射太阳斑 +
+// 浊度控制地平线霾，纯程序化、零外部贴图，不内联大 HDRI）渲染一个小场景，
+// 经 PMREMGenerator 预滤波后充当 scene.environment —— 白漆机身与深色玻璃的
+// 环境反射来自**真实天空**而不是摄影棚格子，太阳方位与 key 平行光严格一致。
+// 太阳盘在环境贴图里关闭（showSunDisc=0）：保留柔和的太阳方向光斑，
+// 但白机身/玻璃上不会出现一块镜像高光的"白斑"。
+const SUN_DIR = new THREE.Vector3(30, 42, 24).normalize();   // 与 key.position 同源
+const skyEnvTex = {};                    // mode -> PMREM 纹理（两种模式各生成一次后缓存）
+let skyMode = 'park';                    // 当前生效的天空模式（setMode 切换，供自检读取）
+let pmrem = null;
+try { pmrem = new THREE.PMREMGenerator(renderer); } catch (e) { /* 无 WebGL 时由上方兜底 */ }
+
+function buildSkyScene(mode) {
+  const s = new THREE.Scene();
+  const sky = new Sky();
+  sky.scale.setScalar(100);              // PMREM fromScene 默认 far=100，盒体必须装在里面
+  const u = sky.material.uniforms;
+  if (mode === 'air') {
+    // 高空：空气稀薄 → 瑞利散射弱 → 天顶深蓝
+    u.turbidity.value = 2.0;
+    u.rayleigh.value = 0.7;
+    u.mieCoefficient.value = 0.004;
+    u.mieDirectionalG.value = 0.85;
+  } else {
+    // 停泊：低空浊度 + 米氏散射 → 地平线微白霾、太阳周围柔和光斑
+    u.turbidity.value = 4.5;
+    u.rayleigh.value = 1.8;
+    u.mieCoefficient.value = 0.016;
+    u.mieDirectionalG.value = 0.80;
+  }
+  u.sunPosition.value.copy(SUN_DIR);
+  u.showSunDisc.value = 0;               // 环境贴图里不要硬太阳盘（防玻璃/白漆爆白）
+  s.add(sky);
+  // 下半球补一块地面盘：没有它，环境贴图底部是天空散射的暗部，
+  // 机腹/起落架反射会发蓝。颜色取两种模式的地坪/云海基调。
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(70, 32),
+    new THREE.MeshBasicMaterial({ color: mode === 'air' ? 0x93a9bd : 0x9aa4ad }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.5;
+  s.add(ground);
+  return s;
+}
+
+/** 切模式时换天空环境；纹理只生成一次，之后只是引用切换（PMREM 生成约几十 ms）。 */
+function applySkyEnv(mode) {
+  skyMode = mode;
+  if (pmrem) {
+    try {
+      if (!skyEnvTex[mode]) {
+        const sc = buildSkyScene(mode);
+        skyEnvTex[mode] = pmrem.fromScene(sc, 0.02, 0.1, 200).texture;
+        sc.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+      }
+      scene.environment = skyEnvTex[mode];
+      return;
+    } catch (e) {
+      console.warn('程序化天空环境不可用，退回 RoomEnvironment：', e);
+    }
+  }
+  applyFallbackEnv();
+}
+applySkyEnv('park');
+
+// RoomEnvironment 仅作程序化天空失败时的兜底（功能上不再需要它）。
+function applyFallbackEnv() {
+  try {
+    if (!pmrem) pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  } catch (e) {
+    console.warn('RoomEnvironment 兜底也不可用：', e);
+  }
+}
+
+const camera = new THREE.PerspectiveCamera(42, stage.clientWidth / stage.clientHeight, 0.4, 800);
+// camera-controls：比 OrbitControls 多出平滑过渡与 setLookAt / fitToBox，
+// 课堂"一键切到货舱特写""按讲稿走位"就靠它，OrbitControls 做不了带缓动的定点切换。
+const controls = new CameraControls(camera, renderer.domElement);
+controls.smoothTime = 0.42;
+controls.dollySpeed = 0.8;
+
+// ── 灯光：主光带阴影 + 补光 + 轮廓光 ──────────────────────────────────────
+// 批次2 与程序化天空配套：主光色温略暖（日光），强度收在 2.2~2.8 区间；
+// 环境光大头交给天空 IBL（scene.environment），hemi 只做柔和补底，
+// 强度比批次1低 —— 否则白漆会被环境+hemi 双重打平、"高级干净"感尽失。
+// 注意：半球光必须**存进变量** —— 双模式切换时要改它的强度，内联 add 会取不到。
+const hemi = new THREE.HemisphereLight(0xeaf3fb, 0xa8b2ba, 0.6);
+scene.add(hemi);
+
+const key = new THREE.DirectionalLight(0xfff2e0, 2.5);
+key.position.set(30, 42, 24);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.near = 1;
+key.shadow.camera.far = 170;
+key.shadow.camera.left = -36;
+key.shadow.camera.right = 36;
+key.shadow.camera.top = 36;
+key.shadow.camera.bottom = -36;
+key.shadow.bias = -0.0012;
+key.shadow.normalBias = 0.03;
+scene.add(key);
+scene.add(key.target);
+
+const fill = new THREE.DirectionalLight(0xdceaf7, 0.45);
+fill.position.set(-32, -18, -26);
+scene.add(fill);
+
+const rim = new THREE.DirectionalLight(0xffffff, 0.4);
+rim.position.set(-6, 18, -42);
+scene.add(rim);
+
+// ── 地面：淡网格给尺度感 + 接影面（取代 Blender 里那块 100×70 的深色板）──
+// 原来 ENV_GROUND 是一整块深色长方体，在浅色背景上非常突兀、像个黑洞。
+// 现在改两层网格 + 只接阴影的透明面：背景渐变能透出来，机身有落地感。
+const groundGroup = new THREE.Group();
+groundGroup.name = '__GROUND__';
+
+const gridFine = new THREE.GridHelper(140, 140, 0xb9c5d0, 0xcbd5de);
+gridFine.material.transparent = true;
+gridFine.material.opacity = 0.5;
+groundGroup.add(gridFine);
+
+const gridCoarse = new THREE.GridHelper(140, 14, 0x8fa3b4, 0x8fa3b4);
+gridCoarse.material.transparent = true;
+gridCoarse.material.opacity = 0.45;
+gridCoarse.position.y = 0.008;
+groundGroup.add(gridCoarse);
+
+const shadowCatcher = new THREE.Mesh(
+  new THREE.PlaneGeometry(140, 140),
+  new THREE.ShadowMaterial({ opacity: 0.22 })
+);
+shadowCatcher.rotation.x = -Math.PI / 2;
+shadowCatcher.receiveShadow = true;
+groundGroup.add(shadowCatcher);
+
+groundGroup.position.y = -3.40;      // 与 Blender 地面同高，轮子刚好落地
+scene.add(groundGroup);
+
+// 剖切平面：初始关闭（constant 极大 = 不裁切）
+const clipPlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 1e5);
+
+// ── 加载 GLB ───────────────────────────────────────────────────────────────
+const draco = new DRACOLoader();
+draco.setDecoderPath('./vendor/three/examples/jsm/libs/draco/gltf/');
+const loader = new GLTFLoader();
+loader.setDRACOLoader(draco);
+
+const modelRoot = new THREE.Group();
+scene.add(modelRoot);
+mark('scene-ready');
+
+// 几何签名：与 Blender 侧、Node 侧同一套采样哈希，保证三处结果一致
+function geomSig(g) {
+  const pos = g.attributes.position.array;
+  let h = 2166136261 >>> 0;
+  const step = Math.max(1, Math.floor(pos.length / 3000));
+  for (let i = 0; i < pos.length; i += step) {
+    h ^= Math.round(pos[i] * 10000) & 0xffffffff;
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  h ^= pos.length; h = Math.imul(h, 16777619) >>> 0;
+  h ^= (g.index ? g.index.count : 0);
+  return (h >>> 0).toString(16) + '_' + pos.length;
+}
+
+// ── 批次2 · GLB 材质覆写（按材质名，不改 GLB）────────────────────────────
+// 外观件的分色在 Blender 侧已按材质名做好（白漆/深色玻璃/尾喷金属/点缀蓝），
+// 视图侧只调 PBR 参数让这些材质在新天空下有"高级干净"的反射：
+//   白漆族  rough 0.35 / metal 0.05 / env 1.15 + clearcoat（车漆感）
+//   玻璃    rough 0.10 / metal 0.10 / env 1.3（反射清晰但不镜像天空白斑）
+//   尾喷金属 env 1.0；点缀/腰线 env 1.1
+const WHITE_FAMILY = new Set(['M_PaintWhite', 'M_Hull', 'M_PlaneBody', 'M_PlaneTail', 'M_PlaneWing']);
+// 轮次2 · 内饰/业载加深表：用户反馈"拆解时内饰与飞机颜色太接近、看不清"。
+// 与白漆覆写同一机制（按材质名、viewer 侧、不改 GLB），
+// 拆解态 t=100 下前/中/后舱三色 + 货箱/行李/油箱对白地面一眼可辨为判据。
+const PAYLOAD_TINT = {
+  M_pF: 0xcc610f,   // 前舱座椅 深橙
+  M_pM: 0x0d80bf,   // 中舱座椅 青蓝
+  M_pA: 0xb3267a,   // 后舱座椅 玫红
+  M_cF: 0xc79414,   // 1 舱货箱 深黄
+  M_cA: 0xc75c14,   // 3 舱货箱 深橙
+  M_cB: 0x8c5229,   // 散货舱货箱 棕
+  M_Bag: 0x6b4d2e,  // 行李 深棕
+  M_fW: 0x148547,   // 翼油箱 深绿
+  M_fC: 0x1461ad,   // 中央油箱 深蓝
+  M_Gr: 0x148547,   // 货网/附属件 同深绿
+  M_Bd: 0x148547,
+  M_Floor2: 0x292e38, // 货舱地板 深板岩
+};
+const GLB_DRIVEN = new Set([...WHITE_FAMILY, ...Object.keys(PAYLOAD_TINT),
+  'M_CockpitGlass', 'M_Nozzle', 'M_Eng', 'M_FanDark',
+  'M_Accent', 'M_PaintBlue', 'M_Frame', 'M_Outline', 'M_Radome',
+  'M_NavRed', 'M_NavGreen', 'M_NavWhite']);
+
+/** 标准材质 → 物理材质（为 clearcoat 车漆感）。白漆族专用，其余材质不动。
+ *  注意不能 p.copy(mat)：Physical.copy 会读 clearcoatNormalScale 等物理专属字段，
+ *  标准材质上没有 → Vector2.copy(undefined) 抛错（批次2实测踩过）。
+ *  只用 MeshStandardMaterial 层面的 copy，物理字段随后自己赋值。 */
+function toPhysical(mat) {
+  if (mat.isMeshPhysicalMaterial) return mat;
+  const p = new THREE.MeshPhysicalMaterial();
+  THREE.MeshStandardMaterial.prototype.copy.call(p, mat);
+  return p;
+}
+
+const tunedMatMap = new Map();           // 原始材质 -> 覆写后材质（不能挂 userData：clone 时 JSON 序列化会循环引用）
+
+function tuneGlbMaterial(mat) {
+  if (!mat) return mat;
+  // 同一材质被多个网格共享（gltf-transform dedup 后尤其普遍）：
+  // 必须返回**同一个**覆写实例，否则桶 key（含 material.uuid）会把它们拆开、draw call 暴涨。
+  if (tunedMatMap.has(mat)) return tunedMatMap.get(mat);
+  const n = mat.name || '';
+  let out = mat;
+  if (WHITE_FAMILY.has(n)) {
+    out = toPhysical(mat);
+    out.roughness = 0.35;  out.metalness = 0.05;
+    out.envMapIntensity = 1.15;
+    out.clearcoat = 0.55;  out.clearcoatRoughness = 0.22;
+  } else if (n === 'M_CockpitGlass') {
+    out.roughness = 0.10;  out.metalness = 0.10;  out.envMapIntensity = 1.3;
+  } else if (n === 'M_Nozzle' || n === 'M_Eng') {
+    out.envMapIntensity = 1.0;
+  } else if (n === 'M_Accent' || n === 'M_PaintBlue') {
+    out.roughness = 0.38;  out.metalness = 0.10;  out.envMapIntensity = 1.1;
+  } else if (n === 'M_Frame' || n === 'M_Outline' || n === 'M_FanDark') {
+    out.envMapIntensity = 0.85;          // 深色件少反一点，避免死黑里泛蓝
+  } else if (n in PAYLOAD_TINT) {
+    out.color.setHex(PAYLOAD_TINT[n]);   // 轮次2：内饰/业载加深加饱和（只改色，PBR 参数沿用 GLB）
+  }
+  tunedMatMap.set(mat, out);
+  return out;
+}
+
+const buckets = new Map();     // key -> {geom,mat,group,layer,dir,items[]}
+const groupStat = new Map();   // group -> {count, layer, visible}
+const srcStat = new Map();
+let srcMeshCount = 0, modelBox = new THREE.Box3();
+
+/** 客舱座椅重排：GLB 三个舱段（0A/0B/0C）各自独立排版，边界排距不一致 ——
+ *  前舱 12 排占到站位 17.29，中舱却从 17.0 起排，第 12/13 排在空间上倒挂、
+ *  互相穿插 0.30 m（椅背扎进邻排坐垫）。根源是 31 排 × 0.79 m 本就放不进
+ *  23.6 m 的客舱地板。这里按**排号**（1→31，1 排在机头端）重排成均匀排距
+ *  ≈0.747 m，保持第 1 排与第 31 排锚点不动（客舱包络不变）。
+ *  ★ 必须按排号而不是按 x 排序：数据里第 13 排本来就排在第 12 排前方，
+ *    按 x 排序会把这层错序原样保留（橙色排混进蓝区——已踩过）。
+ *  只动实例位置，几何与拆解方向不变；货舱/油箱/起落架不受影响。 */
+function relayoutCabinSeats() {
+  const SEAT_RE = /^Seat[BH]?_[A-Z]+_(\d+)_\d+$/;
+  const rows = new Map();               // 排号 -> 该排坐垫实例的 x（同排 6 个坐垫 x 相同）
+  for (const b of buckets.values()) {
+    if (!/^PAX_0[ABC]$/.test(b.group)) continue;
+    for (const it of b.items) {
+      const m = it.name && it.name.match(SEAT_RE);
+      if (m && !rows.has(+m[1])) rows.set(+m[1], it.pos.x);
+    }
+  }
+  if (rows.size < 2) return;            // 数据异常时不动手，宁可维持原状
+  const nums = [...rows.keys()].sort((a, b) => a - b);   // 排号升序：1 排在机头端
+  const x0 = rows.get(nums[0]);
+  const pitch = (x0 - rows.get(nums[nums.length - 1])) / (nums.length - 1);
+  const delta = new Map();              // 排号 -> 整排的 x 平移量
+  for (let i = 0; i < nums.length; i++) {
+    delta.set(nums[i], (x0 - i * pitch) - rows.get(nums[i]));
+  }
+  for (const b of buckets.values()) {
+    if (!/^PAX_0[ABC]$/.test(b.group)) continue;
+    for (const it of b.items) {
+      const m = it.name && it.name.match(SEAT_RE);
+      const d = m && delta.get(+m[1]);
+      if (d) it.pos.x += d;             // 坐垫/椅背/头枕同排同位移，相对关系不变
+    }
+  }
+}
+
+
+mark('fetch-glb');
+loader.load('./teach_model.glb', async (gltf) => {
+  mark('glb-parsed');
+  gltf.scene.updateWorldMatrix(true, true);
+  gltf.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    srcMeshCount++;
+    o.material = tuneGlbMaterial(o.material);   // 批次2：按材质名覆写 PBR 参数
+    const ud = o.userData || {};
+    const group = ud.lb_group || 'UNKNOWN';
+    const layer = (ud.lb_layer === undefined || ud.lb_layer === null) ? 9 : ud.lb_layer;
+    const src = ud.lb_src || '?';
+    const dir = B2G(ud.lb_dir || [0, 0, 0]);
+
+    const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3();
+    o.matrixWorld.decompose(pos, quat, scl);
+
+    if (group !== 'ENV_GROUND') modelBox.expandByPoint(pos);
+
+    const gk = geomSig(o.geometry) + '|' + o.material.uuid + '|' + group + '|' + src;
+    if (!buckets.has(gk)) {
+      buckets.set(gk, { sig: gk.split('|')[0], geom: o.geometry, mat: o.material,
+                        group, layer, src, dir: dir.clone(), items: [] });
+    }
+    buckets.get(gk).items.push({ pos: pos.clone(), quat: quat.clone(), scl: scl.clone(),
+                                 name: o.name });
+
+    const gs = groupStat.get(group) || { count: 0, layer };
+    gs.count++; groupStat.set(group, gs);
+    srcStat.set(src, (srcStat.get(src) || 0) + 1);
+  });
+
+  relayoutCabinSeats();           // GLB 舱段边界座椅穿插（12/13 排）——实例化前重排
+  buildInstanced();
+  mark('instanced');
+  buildPanelUI();
+  mark('panel');
+  fitCamera();
+  mark('camera');
+  buildModeUI();                  // 双模式环境 + 发动机风扇（依赖 instList，故在 buildInstanced 之后）
+  mark('mode-ready');
+  // 载重联动是增强功能，初始化失败**不能让三维一起死**（已踩过：
+  // KPI 元素取错导致异常，animate() 都没启动，三维区整块空白）。
+  try {
+    await initLoad();               // 载重参数联动 + 点击拾取
+    mark('load-ready');
+  } catch (e) {
+    console.warn('载重联动模块初始化失败（三维仍可用）：', e);
+  }
+
+  const uniqGeom = new Set([...buckets.values()].map((b) => b.sig)).size;
+  let units = 0;
+  for (const [, b] of buckets) units += b.items.length;
+  const diag = () => {
+    $('h_diag').innerHTML =
+      `源网格 <b>${srcMeshCount}</b> · 几何签名 <b>${uniqGeom}</b> · ` +
+      `实例网格(draw) <b>${instList.length}</b> · 实例 <b>${units}</b> · ` +
+      `组 <b>${groupStat.size}</b> · 标注 <b>${labelCount}</b> (${LABEL_MODE})`;
+  };
+  diag();
+
+  window.__LB_OK = true;                 // 通知经典脚本兜底诊断：真的成功了，别再报错
+  $('loading').style.display = 'none';
+  $('err').style.display = 'none';      // 若看门狗先报过超时，加载成功要把它撤掉
+  mark('animating');
+  applyUrlParams();
+  animate();
+
+  // 标注层不阻塞首帧：文字只是增强，拿不到也不该让三维黑屏
+  buildLabels().then(diag);
+}, undefined, (e) => {
+  fail('<b>加载 GLB 失败</b><br>' + (e && e.message ? e.message : e) +
+    '<br><br>若浏览器地址栏是 <code>file://</code> 开头，说明用了直接双击打开的方式。' +
+    'ES 模块与 GLB 读取都会被 CORS 拦截，请改用本目录下的启动脚本起本地服务：' +
+    '<br><code>启动三维预览.ps1</code>');
+});
+
+// 用 InstancedMesh 重建：697 个源网格 → 按「几何签名 + 材质 + 拆解组」归并
+const instList = [];
+const mats = new Set();
+
+// ── 教学配色表（第 6 项）──────────────────────────────────────────────────
+// 目标：① 模块间对比度足够、一眼可分；② 克制高级、避免高饱和的"AI 生成质感"。
+// 做法：靠**明度分层**拉对比，而不是靠饱和度 —— 高饱和正是 AI 味的主要来源。
+// 按**功能族**分色，其中用户明确要求 **客舱 / 货舱 / 油箱三者必须能区分**，
+// 所以它们分属三个独立色族（客=暖沙、货=低饱和蓝绿、油=琥珀）；
+// 客舱内部 0A/0B/0C 才用同族明度递变（不花）。
+// ★ 轮次2 起本表降级为**兜底**：客/货/油/地板各组的具名 GLB 材质已进
+//   PAYLOAD_TINT（加深加饱和、GLB_DRIVEN 优先命中），本表只覆盖这些组里
+//   未登记材质的零散件（如 M_Ye 小件），以及起落架等非外观组。
+const GROUP_COLOR = {
+  // 机体 / 结构 —— 最亮
+  HULL_UPPER: [0xd8dee4, 0.58, 0.10],
+  DOORS:      [0xe4e8ec, 0.55, 0.08],
+  BELLY_FAIRING: [0xc2c9d0, 0.62, 0.10],
+  FLOOR_CABIN: [0xb6bec6, 0.70, 0.05],
+  FLOOR_CARGO: [0xa7afb7, 0.72, 0.05],
+  WINDOWS:    [0x33414f, 0.18, 0.35],      // 舷窗/风挡：深色玻璃
+  MARKINGS:   [0x2f6f9f, 0.50, 0.05],      // 腰线（唯一的高识别色，作为点缀）
+  // 升力面 —— 中灰偏冷
+  WING_L: [0x98a4b0, 0.60, 0.12],
+  WING_R: [0x98a4b0, 0.60, 0.12],
+  TAIL_HS: [0xa8b3be, 0.60, 0.12],
+  TAIL_VS: [0xa8b3be, 0.60, 0.12],
+  // 动力 —— 深石墨
+  ENG_L: [0x465058, 0.45, 0.55],
+  ENG_R: [0x465058, 0.45, 0.55],
+  // 燃油 —— 琥珀族（独立）
+  FUEL_WING_L: [0xc08a3e, 0.62, 0.08],
+  FUEL_WING_R: [0xc08a3e, 0.62, 0.08],
+  FUEL_CTR:    [0xa97630, 0.62, 0.08],
+  // 业载 · 客舱 —— 暖沙族，三区明度递变
+  PAX_0A: [0xd9c3a4, 0.75, 0.0],
+  PAX_0B: [0xc8ac88, 0.75, 0.0],
+  PAX_0C: [0xb6956c, 0.75, 0.0],
+  // 业载 · 货舱 —— 低饱和蓝绿族
+  CARGO_1: [0x6f9b8e, 0.72, 0.0],
+  CARGO_3: [0x5d8a7c, 0.72, 0.0],
+  CARGO_5: [0x4c776a, 0.72, 0.0],
+  BAG_1:   [0x7fa89b, 0.72, 0.0],
+  BAG_3:   [0x6d9689, 0.72, 0.0],
+  // 起落架 —— 近黑 + 金属
+  GEAR_N:     [0x394046, 0.45, 0.80],
+  GEAR_ML:    [0x394046, 0.45, 0.80],
+  GEAR_MR:    [0x394046, 0.45, 0.80],
+  GEAR_WHEEL: [0x1b2025, 0.80, 0.05],
+};
+const _paletteCache = new Map();
+
+/** 取该桶的材质：分两级 ——
+ *  ① 按 **GLB 材质名** 判定（GLB_DRIVEN）：外观件（白漆/玻璃/尾喷/点缀/刻线）
+ *     与内饰业载（PAYLOAD_TINT：座椅三色/货箱/行李/油箱，轮次2 起）——
+ *     用覆写后的 GLB 材质克隆，保留 Blender 侧分色与 viewer 侧加深；
+ *  ② 其余（起落架等教学配色组）：按 **拆解组** 取教学配色表，
+ *     表里没有的组沿用 GLB 自带材质（避免误改环境/标注类物件）。
+ *  无论哪条路都克隆一份 —— 点击高亮/剖切要单独改，共用实例会把同材质的
+ *  其它组一起点亮或一起剖掉（已踩过）。 */
+function matFor(b) {
+  const mn = b.mat.name || '';
+  if (GLB_DRIVEN.has(mn)) return b.mat.clone();
+  const spec = GROUP_COLOR[b.group];
+  if (!spec) return b.mat.clone();
+  const key = b.group;
+  let base = _paletteCache.get(key);
+  if (!base) {
+    base = new THREE.MeshStandardMaterial({
+      color: spec[0], roughness: spec[1], metalness: spec[2],
+    });
+    _paletteCache.set(key, base);
+  }
+  return base.clone();
+}
+
+function buildInstanced() {
+  const seen = new Set();
+  for (const [, b] of buckets) {
+    if (seen.has(b.geom)) continue;
+    seen.add(b.geom);
+    // BVH 加速结构（three-mesh-bvh）。非索引几何不支持，跳过即可，
+    // 只是回退到 three 原生 raycast，不影响显示。
+    if (b.geom.index) {
+      try { b.geom.computeBoundsTree(); } catch (e) { /* 忽略，回退原生 raycast */ }
+    }
+  }
+  for (const [, b] of buckets) {
+    // 材质取**教学配色表**（按功能族）+ 克隆一份（点击高亮/剖切要单独改，
+    // 共用实例会把同材质的其它组一起点亮或一起剖掉 —— 已踩过）。
+    const mat = matFor(b);
+    mat.clippingPlanes = CUT_GROUPS.has(b.group) ? [clipPlane, sectionPlane] : [clipPlane];
+    mat.side = THREE.DoubleSide;
+    mat.needsUpdate = true;
+    const im = new THREE.InstancedMesh(b.geom, mat, b.items.length);
+    im.frustumCulled = false;                       // 实例会被爆炸推到远处
+    im.castShadow = true;
+    im.receiveShadow = true;
+    im.userData = { lb_group: b.group, lb_layer: b.layer };
+    mats.add(mat);
+    modelRoot.add(im);
+    instList.push({ im, b });
+  }
+  for (const m of mats) {
+    if (!m.clippingPlanes || m.clippingPlanes.length === 0) m.clippingPlanes = [clipPlane];
+    m.side = THREE.DoubleSide;                      // 剖开后能看见内壁
+    m.needsUpdate = true;
+  }
+  // 层内错峰：同波实例按「高度优先、站位其次」排序，逐个给出启动延时，
+  // 避免整层像一块板一样刚性平移（这是之前明确列出的观感短板）。
+  const byLayer = new Map();
+  for (const { b } of instList) {
+    if (!LAYER_WINDOW[b.layer]) continue;
+    if (!byLayer.has(b.layer)) byLayer.set(b.layer, []);
+    for (const it of b.items) byLayer.get(b.layer).push(it);
+  }
+  for (const [L, arr] of byLayer) {
+    arr.sort((a, c) => (a.pos.y - c.pos.y) || (a.pos.x - c.pos.x));
+    const win = LAYER_WINDOW[L][1] - LAYER_WINDOW[L][0];
+    const n = Math.max(arr.length - 1, 1);
+    arr.forEach((it, i) => { it.stag = win * STAGGER_FRAC * (i / n); });
+  }
+
+  buildExplodeEnvelope();
+  $('h_inst').textContent = instList.length;
+}
+
+/**
+ * 计算爆炸后的**总包络**（所有实例在 T=1 时落位的并集），供相机适配。
+ * 注意本版运动是**水平**的（±Z / −X），包络主要向两侧与后方扩张，
+ * 竖向几乎不变 —— 所以判据不能再只看竖向（那是 v2.2 向上阶梯的遗留）。
+ */
+function buildExplodeEnvelope() {
+  const box = new THREE.Box3();
+  const _b3 = new THREE.Box3(), _m4 = new THREE.Matrix4(), _p3 = new THREE.Vector3();
+  for (const { b } of instList) {
+    if (!b.geom.boundingBox) b.geom.computeBoundingBox();
+    const amp = LAYER_WINDOW[b.layer] ? (LAYER_AMP[b.layer] || 0) : 0;
+    for (const it of b.items) {
+      _p3.copy(it.pos);
+      if (amp) _p3.addScaledVector(b.dir, amp);
+      _m4.compose(_p3, it.quat, it.scl);
+      box.union(_b3.copy(b.geom.boundingBox).applyMatrix4(_m4));
+    }
+  }
+  EXPLODE_ENV = box;
+  if (LAYER_DIAG) {
+    const s = box.getSize(new THREE.Vector3());
+    console.log(`[爆炸包络] 尺寸 ${s.x.toFixed(1)} × ${s.y.toFixed(1)} × ${s.z.toFixed(1)} m` +
+                `   Y 范围 ${box.min.y.toFixed(2)} .. ${box.max.y.toFixed(2)}` +
+                `   （地面在 −3.40，min.y 必须 ≥ −3.40）`);
+  }
+}
+const LAYER_DIAG = new URLSearchParams(location.search).has('diag');
+
+// ── 标注层：labels.json → canvas 贴图 Sprite（契约 §八）─────────────────────
+const LABEL_FOLLOW = { CARGO_TAG_1: 'CARGO_1', CARGO_TAG_3: 'CARGO_3', CARGO_TAG_4: 'CARGO_5' };
+const labelGroup = new THREE.Group();
+labelGroup.visible = false;                        // 默认关，避免与 3D 标尺混在一起
+scene.add(labelGroup);
+let labelCount = 0;
+
+function makeLabelSprite(text, sizeM) {
+  const fs = 40, pad = 10;
+  const probe = document.createElement('canvas').getContext('2d');
+  probe.font = `${fs}px "Microsoft YaHei", sans-serif`;
+  const w = Math.ceil(probe.measureText(text).width) + pad * 2;
+  const h = fs + pad * 2;
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const g = cv.getContext('2d');
+  g.font = `${fs}px "Microsoft YaHei", sans-serif`;
+  g.fillStyle = 'rgba(255,255,255,0.86)';
+  g.strokeStyle = 'rgba(24,95,165,0.45)';
+  g.lineWidth = 3;
+  g.beginPath();
+  if (g.roundRect) g.roundRect(1.5, 1.5, w - 3, h - 3, 10); else g.rect(1.5, 1.5, w - 3, h - 3);
+  g.fill(); g.stroke();
+  g.fillStyle = '#0c447c';
+  g.textBaseline = 'middle';
+  g.fillText(text, pad, h / 2 + 1);
+
+  const tex = new THREE.CanvasTexture(cv);
+  tex.anisotropy = 4;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, depthTest: false, depthWrite: false
+  }));
+  spr.renderOrder = 999;
+  const H = Math.max(sizeM * 4.2, 0.5);
+  spr.scale.set(H * (w / h), H, 1);
+  return spr;
+}
+
+// troika-three-text：SDF 文字，任意缩放下都清晰，且不产生几何顶点。
+// 动态 import + 失败回退：拿不到就退回 canvas 贴图 Sprite，绝不因此让三维开不了。
+let TextCtor = null, LABEL_MODE = 'canvas';
+async function loadTextLib() {
+  try {
+    const m = await import('troika-three-text');
+    TextCtor = m.Text;
+    LABEL_MODE = 'troika-sdf';
+  } catch (e) {
+    TextCtor = null;
+    LABEL_MODE = 'canvas-sprite';
+    console.warn('troika-three-text 不可用，回退 canvas 贴图：', e);
+  }
+}
+
+// 避让优先级：数值越大越优先保留。
+// 排法按**教学主次**而不是按名字：舱区（0A/0B/0C）是配载的核心结构，必须最先保住；
+// 货舱吊牌次之；部件名再次；标尺刻度（T*/TY_*）最容易牺牲 —— 它们数量最多、
+// 位置最密，且面板上另有刻度读数。
+// 踩过：初版把舱区与货舱吊牌放同一优先级，冲突时按相机距离抢位，
+// 结果三个舱区名只保住一个（而它们本该优先）。
+function labelPriority(name) {
+  if (name === 'CG_LIVE') return 200;      // 重心标记上的实时标签：最高，绝不让位
+  if (name === 'UI_DYN') return 110;
+  if (name.startsWith('T_Zone_')) return 100;
+  if (name.startsWith('CARGO_TAG_')) return 90;
+  if (name.startsWith('Lab_')) return 80;
+  if (name.startsWith('TY_')) return 45;
+  if (name.startsWith('T_')) return 40;
+  return 30;
+}
+
+// 站位 → 模型 X。契约里机头尖端在 +18.785（= LENGTH/2），站位 st 自机头 DATUM 起算。
+const DATUM_X = 18.785;
+
+async function buildLabels() {
+  await loadTextLib();
+  try {
+    const data = await (await fetch('./labels.json')).json();
+    for (const l of data.labels) {
+      // —— 移除 HUD 展示板上的文字 ——
+      // 这 14 条 UI_* 锚在 |y| = 14.55，正是原 `HUD_BG` 那块 9.80×5.20 m 展示屏的位置
+      // （Blender 里 Z=+14.5）。用户已明确要求把那块"立在飞机旁边的屏幕"移除
+      // （见 stage2_shape.py 的 drop(["HUD_BG","HUD"])），屏上的文字自然不该留。
+      // 而且它们是 Blender 阶段 7 的**烘焙值**（CG=18.27m %MAC=32.1%），
+      // 与右侧 HTML 面板（实时）重复；拖动载重滑块时这些数字不会变，教学上会误导。
+      // 实时数值改由：① HTML 面板/KPI ② UI_DYN（舱顶上方）③ CG_LIVE（跟随重心）承担。
+      if (Math.abs(l.anchor[1]) > 10) continue;
+      const p = B2G(l.anchor);
+      let obj;
+      if (TextCtor) {
+        const t = new TextCtor();
+        t.text = l.text;
+        t.fontSize = Math.max(l.size * 3.0, 0.42);
+        t.color = 0x0c447c;
+        t.anchorX = 'center';
+        t.anchorY = 'middle';
+        t.outlineWidth = '8%';
+        t.outlineColor = 0xffffff;
+        t.material.depthTest = false;
+        t.material.depthWrite = false;
+        t.material.transparent = true;
+        t.renderOrder = 999;
+        t.sync();
+        obj = t;
+      } else {
+        obj = makeLabelSprite(l.text, l.size);
+      }
+      obj.position.copy(p);
+      obj.userData = { lb_label: l.name, follow: LABEL_FOLLOW[l.name] || null,
+                       base: p.clone(), pri: labelPriority(l.name) };
+      labelGroup.add(obj);
+      labelCount++;
+    }
+    // 动态标签：跟着实时重心走（文本与位置都在 applyLiveLabels 里刷新）。
+    // 它是 3D 里唯一直接标注重心数值的元素 —— 拖动载重滑块时会看到它沿机身滑动。
+    {
+      const t = TextCtor ? new TextCtor() : makeLabelSprite('CG', 0.32);
+      if (TextCtor) {
+        t.text = 'CG';
+        t.fontSize = 0.52;
+        t.color = 0xb45309;
+        t.anchorX = 'center';
+        t.anchorY = 'bottom';
+        t.outlineWidth = '10%';
+        t.outlineColor = 0xffffff;
+        t.material.depthTest = false;
+        t.material.depthWrite = false;
+        t.material.transparent = true;
+        t.renderOrder = 1000;
+        t.sync();
+      }
+      t.userData = { lb_label: 'CG_LIVE', follow: null, base: new THREE.Vector3(), pri: 200 };
+      t.position.set(DATUM_X - 18.267, 5.2, 0);      // 初始重心（站位 18.267），标在座舱上方
+      labelGroup.add(t);
+      labelCount++;
+    }
+    // 标注构建是异步的，可能晚于 initLoad → 建好后立刻用已有的配载结果回填一次
+    if (typeof lastLoad !== 'undefined' && lastLoad) applyLiveLabels(lastLoad);
+  } catch (e) {
+    console.warn('labels.json 未加载，跳过标注层', e);
+  }
+}
+
+// ── 动态标签：接实时配载计算 ────────────────────────────────────────────────
+// 原状：`TY_cur`（横向 y）与 `UI_DYN` 都是 Blender 阶段 7 烘焙的固定文字，
+// 拖动载重滑块后 3D 场景里的数字纹丝不动 —— 与面板各说各话。
+let CG_DX = 0;              // 重心标记沿 X 的位移（米）
+let LAT_Z = 0;              // 横向游标沿 Z 的位移（米）
+let CG_BASE = null, CY_BASE = null;    // 初始重心 / 初始横向重心（只取增量）
+// 横向标尺的放大倍数：实测 `YTick_+05` 落在 z=−0.80 而它标的是 +0.5 m
+// → 标尺把 ±0.5 m 画成 ±0.8 m，放大 1.6 倍。游标必须按同一比例移动才不会脱标。
+const LAT_SCALE = 1.6;
+
+function lbGet(name) {
+  for (const o of labelGroup.children) if (o.userData.lb_label === name) return o;
+  return null;
+}
+
+function lbSetText(o, s) {
+  if (!o || o.userData.txt === s) return;
+  o.userData.txt = s;
+  if (o.isSprite) {                 // canvas 回退：重建贴图
+    const repl = makeLabelSprite(s, 0.28);
+    o.material.map.dispose();
+    o.material.map = repl.material.map;
+    o.material.needsUpdate = true;
+    o.scale.copy(repl.scale);
+  } else {
+    o.text = s;
+    o.sync();                       // troika 异步重建 SDF，内部自己合帧
+  }
+}
+
+function applyLiveLabels(r) {
+  if (CG_BASE === null) { CG_BASE = DATUM_X - r.cg; CY_BASE = r.cy; }
+  CG_DX = (DATUM_X - r.cg) - CG_BASE;          // 重心标记随实时重心沿机身滑动
+  LAT_Z = -LAT_SCALE * (r.cy - CY_BASE);       // 横向游标随实时横向重心滑动
+  lbSetText(lbGet('TY_cur'), 'y = ' + (r.cy >= 0 ? '+' : '') + r.cy.toFixed(3) + ' m');
+  // 两条动态标签**内容互补**，不要都写 CG ——
+  // 它们都在机身正上方，默认机位下屏幕投影只差十几像素、必然互相遮挡，
+  // 写成同一条信息的话被让掉哪条都等于全丢（实测踩过）。
+  //   CG_LIVE（挂在重心标记上方，跟随重心移动）：重心位置
+  //   UI_DYN （固定在座舱上方）：总重与零油重
+  const s = 'CG ' + r.cg.toFixed(2) + ' m ｜ ' + r.mac.toFixed(2) + '% MAC';
+  const cg = lbGet('CG_LIVE');
+  if (cg) {
+    lbSetText(cg, s);
+    cg.position.set(DATUM_X - r.cg, 5.2, 0);
+  }
+  lbSetText(lbGet('UI_DYN'),
+            'TOW ' + r.tow.toFixed(0) + ' kg ｜ ZFW ' + r.zfw.toFixed(0) + ' kg');
+}
+
+// ── 停泊状态的"翘头 / 翘尾"（第 1 项）────────────────────────────────────
+// 物理事实：三轮车式起落架，**重心必须在主轮接地点之前**，否则前轮载荷归零、
+// 机身绕主轮接地点向后翻，直到尾锥触地（"尾坐"）。
+// 主轮接地点站位 = LEMAC + 0.365×MAC（与 stage2_refine.MG_STATION 同一口径），
+// 恰好在包线后限 36% 稍后 —— 所以"重心一出后限就尾坐"，因果自洽。
+// 重心靠前但在包线内时飞机保持水平：地面停机是三点接触，
+// 任何绕主轮的整体低头都会把前轮压进机坪（轮胎穿地，已踩过）。
+const TIP_MAX = 0.19;                 // 尾坐最大角度（rad ≈ 11°，此时尾锥刚好触地）
+const NOSE_DN = 0.167;                // 机头触地所需俯角（≈9.5°，由"接地点→机头下缘"几何算出）
+let PARK_BREAK = 0;                   // 前轮折断进度 0→1（支柱压扁 + 机头下沉）
+const _tP = new THREE.Vector3(), _tV = new THREE.Vector3(), _tM = new THREE.Matrix4();
+
+function applyParkTip(r) {
+  const A = AC.aircraft;
+  const mgSt = A.mg_station;                                   // 主轮接地点站位
+  const ngSt = A.ng_station;                                   // 前轮接地点站位
+  // 数据表守卫：旧版 groups.json 没有起落架站位字段（2026-09-24 dev 页事故根因 ——
+  // stale 数据让 mgSt 为 undefined，首帧 animate 每帧抛 TypeError、渲染循环被打死）。
+  // 这里缺字段就整体跳过姿态联动：宁可没有翘头效果，也不能让三维黑屏。
+  if (typeof mgSt !== 'number' || typeof ngSt !== 'number') {
+    modelRoot.rotation.set(0, 0, 0);
+    modelRoot.position.x = 0; modelRoot.position.z = 0;
+    const st0 = $('fstate');
+    if (st0) { st0.className = 'cruise'; st0.textContent = '停机：姿态正常'; }
+    return '停机：姿态正常';
+  }
+  const noseLoad = (mgSt - r.cg) / (mgSt - ngSt);              // 前轮载荷占全重的比例
+  let tip = 0, msg = '', broke = false;
+  if (r.cg > mgSt) {
+    // ① 重心越过主轮 → 前轮载荷归零，机身绕主轮后翻直到尾锥触地（尾坐）
+    tip = Math.min((r.cg - mgSt) / 1.2, 1) * TIP_MAX;
+    msg = `停机：尾坐 ${(tip * 180 / Math.PI).toFixed(1)}°（重心 ${r.cg.toFixed(2)} m 已过主轮 ` +
+          `${mgSt.toFixed(2)} m，前轮离地）`;
+  } else if (noseLoad > A.nose_load_max) {
+    // ② 前轮过载 → 支柱折断、机头失去支撑后砸在机坪上
+    tip = -NOSE_DN; broke = true;
+    msg = `停机：前轮过载折断，机头砸在机坪上（前轮载荷 ${(noseLoad * 100).toFixed(0)}% ` +
+          `超过 ${(A.nose_load_max * 100).toFixed(0)}%）`;
+  } else {
+    // 包线内：停机必须水平（三点接触）。前轮载荷变化只用文字表达 ——
+    // 旧版这里给了绕主轮的低头角（最多 2.9°），前轮距主轮 12.6 m，
+    // 默认配载下轮子被压进地面约 0.25 m（实测截图轮胎半埋才定位到）。
+    tip = 0;
+    msg = `停机：姿态正常（重心 ${r.cg.toFixed(2)} m 在主轮 ${mgSt.toFixed(2)} m 之前，` +
+          `前轮载荷 ${(noseLoad * 100).toFixed(0)}%）`;
+  }
+  // 折断进度平滑 0→1；工况恢复正常后自动收回（自愈，不用额外维护状态）。
+  // ★ 这里**不弹事故卡** —— 面板状态行已经写明原因，再弹卡会与提示重复冲突
+  //   （用户反馈：机头砸地场景取消事故弹窗）。事故卡只保留给空中坠机。
+  PARK_BREAK += ((broke ? 1 : 0) - PARK_BREAK) * 0.09;
+
+  // 停在地面的飞机**不会横滚**（起落架撑着），横向偏载只影响轮载分配
+  modelRoot.rotation.set(0, 0, tip);
+  // 旋转必须**绕主轮接地点**而不是模型原点 —— 否则飞机会悬空转、轮子离地。
+  // 推导：t' = P − R·P（P = 主轮接地点，R = 当前旋转矩阵）。
+  _tP.set(DATUM_X - mgSt, -3.40, 0);
+  _tM.makeRotationFromEuler(modelRoot.rotation);
+  _tV.copy(_tP).applyMatrix4(_tM);
+  modelRoot.position.set(_tP.x - _tV.x, _tP.y - _tV.y, _tP.z - _tV.z);
+  const st = $('fstate');
+  if (st) {
+    st.className = broke ? 'unstable' : 'cruise';
+    st.textContent = msg;
+  }
+  return msg;
+}
+
+// （地面事故卡已按用户要求移除：机头砸地只靠面板状态行提示，不弹卡片 —— 避免重复冲突。）
+
+// ── 飞行工况与失稳（第 5 项）──────────────────────────────────────────────
+// 设计（grill 后与用户确认的 D 方案）：**配载主导 + 分级失稳 + 可关闭 + 可复位**
+//   包线内            → 巡航
+//   轻微越界（≤0.5）   → 告警（状态栏转黄、姿态开始抖）
+//   严重越界（>0.5）   → 俯仰/横滚持续发散 + 掉高度 → 姿态超限或接地 = 坠机
+// 教学落点：事故卡把**越界的具体项**逐条列出，因果链直接回到配载平衡。
+const FLIGHT = { speed: 460, alt: 3000, allowCrash: true,
+                 state: 'cruise', pitch: 0, roll: 0, sev: 0, crashed: false };
+const CRASH_LIM = { pitch: 0.873, roll: 1.047 };     // 50° / 60°
+// 时间倍速：`?ff=N` 把飞行演化加速 N 倍。教学演示时不必干等 5 秒才看到后果，
+// 无头自检也靠它把"发散 → 坠机"压缩到截图窗口内（否则只能验到"刚开始发散"）。
+const FF = Math.max(1, +(new URLSearchParams(location.search).get('ff') || 1));
+
+/** 越界指数：0 = 完全在包线内；≥0.5 = 进入失稳。各项都换算成"百分点的倍数"。 */
+function flightSeverity(r) {
+  const A = AC.aircraft;
+  const outMac = Math.max(A.envelope[0] - r.mac, r.mac - A.envelope[1], 0);
+  const outLat = Math.max(Math.abs(r.cy) - A.y_limit, 0);
+  const over = Math.max(r.tow - A.mtow, 0) / A.mtow;
+  const slow = FLIGHT.speed < 320 ? (320 - FLIGHT.speed) / 120 : 0;
+  return outMac / 9 + outLat / 0.30 + over * 4 + slow;
+}
+
+function flightIssues(r) {
+  const A = AC.aircraft, out = [];
+  if (r.mac > A.envelope[1])
+    out.push(`重心 <b>${r.mac.toFixed(2)}% MAC</b> 超出后限 ${A.envelope[1]}%（水平安定面配平不足，抬头无法制止）`);
+  if (r.mac < A.envelope[0])
+    out.push(`重心 <b>${r.mac.toFixed(2)}% MAC</b> 超前于前限 ${A.envelope[0]}%（机头下俯、无法拉起）`);
+  if (Math.abs(r.cy) > A.y_limit)
+    out.push(`横向重心 <b>${(r.cy >= 0 ? '+' : '') + r.cy.toFixed(3)} m</b> 超出 ±${A.y_limit} m（横滚无法配平）`);
+  if (r.tow > A.mtow)
+    out.push(`全重 <b>${r.tow.toFixed(0)} kg</b> 超过 MTOW ${A.mtow.toFixed(0)} kg（升力不足、无法维持高度）`);
+  if (r.imb > A.fuel_imb_limit)
+    out.push(`左右油量差 <b>${r.imb.toFixed(0)} kg</b> 超过 ${A.fuel_imb_limit} kg（持续横滚力矩）`);
+  if (FLIGHT.speed < 320)
+    out.push(`空速 <b>${FLIGHT.speed} km/h</b> 低于最小操纵速度（失速）`);
+  return out;
+}
+
+// ── 场景化参数面板（第 4 项）────────────────────────────────────────────
+// 默认只显示**场景按钮列表**；点某场景 → 该场景专属参数下拉展开，并切到对应环境模式。
+// 顶部常驻提示"当前生效参数组"，让用户随时知道自己在调哪一组。
+// 跨场景重复项已移除：原「显示模式」按钮并入场景按钮；载重参数只归静态停泊；
+// 飞行工况只归空中飞行；拆解类参数只归拆解演示。
+let SCENE = 'park';
+const SCENE_LABEL = { park: '静态停泊 · 配载参数', air: '空中飞行 · 飞行工况', strip: '拆解演示 · 拆解参数' };
+const SCENE_MODE = { park: 'park', air: 'air', strip: 'park' };
+
+function setScene(sc, quiet) {
+  if (!SCENE_LABEL[sc]) sc = 'park';
+  SCENE = sc;
+  document.querySelectorAll('#scenes button').forEach((b) => {
+    b.classList.toggle('on', b.dataset.scene === sc);
+  });
+  document.querySelectorAll('.scenepanel').forEach((p) => {
+    p.classList.toggle('on', p.dataset.panel === sc);
+  });
+  const h = $('sceneHint');
+  if (h) h.textContent = '当前生效参数组：' + SCENE_LABEL[sc];
+  if (!quiet) setMode(SCENE_MODE[sc]);
+}
+
+function initScenePanels() {
+  document.querySelectorAll('#scenes button').forEach((b) => {
+    b.addEventListener('click', () => setScene(b.dataset.scene));
+  });
+  setScene(SCENE, true);           // 只切面板显示，不重复触发 setMode
+}
+
+/** 把当前配载回填到既有滑块（**不重建**面板 —— 重建会导致滑块重复叠加） */
+function backfillLoadSliders() {
+  document.querySelectorAll('#loadpanel input').forEach((inp) => {
+    const v = LOAD[inp.dataset.cat][inp.dataset.key];
+    inp.value = v;
+    inp.parentElement.querySelector('.v').textContent = v;
+  });
+}
+
+/** 预设参数卡：点预设后在**当前生效的场景面板**里弹出该预设的参数，几秒后自动收起。
+ *  解决两件事：① 任何时刻只展示一个预设的参数，不叠加；
+ *              ② 空中场景里 `#loadpanel`（滑块）在停泊面板内不可见 —— 参数卡挂在
+ *                 当前场景面板上，空中点预设同样能看到参数。 */
+let presetTimer = null;
+function showPresetCard(title) {
+  const panel = document.querySelector('.scenepanel.on');
+  if (!panel) return;
+  let card = panel.querySelector('.presetcard');
+  if (!card) {
+    card = document.createElement('div');
+    card.className = 'presetcard';
+    panel.prepend(card);
+  }
+  card.innerHTML = '<div class="pt">' + title + '</div>' + presetLines().join('<br>');
+  card.classList.add('on');
+  clearTimeout(presetTimer);
+  presetTimer = setTimeout(() => card.classList.remove('on'), 4500);
+}
+
+/** 当前配载的一行式摘要（预设参数卡用） */
+function presetLines() {
+  const r = computeLoad();
+  return [
+    `客舱 ${LOAD.pax.FWD} / ${LOAD.pax.MID} / ${LOAD.pax.AFT} 人（前/中/后）`,
+    `货舱 ${LOAD.cargo.FWD} / ${LOAD.cargo.AFT} / ${LOAD.cargo.BULK} kg（1舱/3舱/散货）`,
+    `燃油 左 ${LOAD.fuel.WING_L} · 右 ${LOAD.fuel.WING_R} · 中 ${LOAD.fuel.CTR} kg`,
+    `TOW <b>${r.tow.toFixed(0)} kg</b> ｜ CG <b>${r.cg.toFixed(2)} m（${r.mac.toFixed(2)}% MAC）</b>` +
+    ` ｜ 横向 <b>${(r.cy >= 0 ? '+' : '') + r.cy.toFixed(3)} m</b>`,
+  ];
+}
+
+/** 飞行工况 UI：预设按钮 / 空速 / 油量差 / 允许坠机 / 事故卡复位。 */function initFlightUI() {
+  // 每个预设都把配载推到一种"极端"，用来演示后果（不是随便给个数）
+  const P = {
+    normal: () => {
+      Object.assign(LOAD.pax, AC.init.pax);
+      Object.assign(LOAD.cargo, AC.init.cargo);
+      Object.assign(LOAD.fuel, AC.init.fuel);
+      FLIGHT.speed = 460;
+    },
+    fwdlim: () => {
+      P.normal();
+      LOAD.cargo.FWD = AC.cargo.FWD.max; LOAD.cargo.AFT = 0; LOAD.cargo.BULK = 0;
+      LOAD.pax.FWD = AC.zones.FWD.seats_full; LOAD.pax.MID = 0; LOAD.pax.AFT = 0;
+    },
+    aftlim: () => {
+      P.normal();
+      LOAD.cargo.BULK = AC.cargo.BULK.max; LOAD.cargo.AFT = AC.cargo.AFT.max; LOAD.cargo.FWD = 0;
+      LOAD.pax.AFT = AC.zones.AFT.seats_full; LOAD.pax.FWD = 0; LOAD.pax.MID = 0;
+    },
+    aftx: () => { P.aftlim(); LOAD.fuel.CTR = 0; },          // 后重 + 中央油箱抽空 → 更靠后
+    fwdlimx: () => { P.fwdlim(); LOAD.fuel.CTR = AC.fuel.CTR.max; },
+    // 横向预设必须用**油箱上限**：翼内油箱在 |y|≈7.7 m，3200 kg 只算出 cy≈0.34 m，
+    // 刚好卡在 ±0.35 m 限内、越界指数为 0（实测踩过，看起来"设了却没反应"）。
+    lat: () => { P.normal(); LOAD.fuel.WING_L = 0; LOAD.fuel.WING_R = AC.fuel.WING_R.max; },
+    over: () => {                                            // 满载 + 满油 → 超 MTOW
+      P.normal();
+      for (const k of Object.keys(LOAD.cargo)) LOAD.cargo[k] = AC.cargo[k].max;
+      for (const k of Object.keys(LOAD.pax)) LOAD.pax[k] = AC.zones[k].seats_full;
+      for (const k of Object.keys(LOAD.fuel)) LOAD.fuel[k] = AC.fuel[k].max;
+    },
+    slow: () => { P.normal(); FLIGHT.speed = 240; },
+  };
+  const clearCrash = () => {
+    FLIGHT.crashed = false; FLIGHT.pitch = 0; FLIGHT.roll = 0; FLIGHT.alt = 3000;
+    const c = $('crash'); if (c) c.classList.remove('on');
+  };
+  document.querySelectorAll('[data-f]').forEach((b) => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('[data-f]').forEach((x) => x.classList.remove('on'));
+      b.classList.add('on');
+      const fn = P[b.dataset.f]; if (fn) fn();
+      clearCrash();
+      // 只回填既有滑块 + 弹参数卡（**不要** buildLoadPanel() —— 那会叠加，
+      // 而且滑块面板在停泊场景内、空中场景看不到；参数卡挂在当前场景面板上）
+      backfillLoadSliders();
+      showPresetCard('飞行工况 · ' + b.textContent.trim());
+      refreshLoad();
+    });
+  });
+  const spd = $('f_spd'), imb = $('f_imb'), alw = $('f_allow');
+  if (spd) {
+    spd.addEventListener('input', () => {
+      FLIGHT.speed = +spd.value; $('f_spdv').textContent = spd.value;
+      clearCrash(); refreshLoad();
+    });
+  }
+  if (imb) {
+    imb.addEventListener('input', () => {
+      const d = +imb.value, base = 2200, mx = AC.fuel.WING_R.max;
+      LOAD.fuel.WING_L = Math.max(0, Math.min(mx, base - d / 2));
+      LOAD.fuel.WING_R = Math.max(0, Math.min(mx, base + d / 2));
+      $('f_imbv').textContent = imb.value;
+      clearCrash(); backfillLoadSliders(); refreshLoad();
+    });
+  }
+  if (alw) {
+    alw.checked = FLIGHT.allowCrash;
+    alw.addEventListener('change', () => { FLIGHT.allowCrash = alw.checked; });
+  }
+  const rst = $('crashreset');
+  if (rst) rst.onclick = resetFlight;
+}
+
+function crashNow() {
+  if (FLIGHT.crashed) return;
+  FLIGHT.crashed = true; FLIGHT.state = 'crashed';
+  const r = lastLoad || computeLoad();
+  const A = AC.aircraft, issues = flightIssues(r);
+  const el = $('crashbody');
+  if (el) {
+    el.innerHTML =
+      '<div>配载越界 → 姿态发散 → 失去控制。事故瞬间的配载状态：</div>' +
+      `<div style="margin:6px 0">TOW <b>${r.tow.toFixed(0)} kg</b> ｜ CG <b>${r.cg.toFixed(2)} m` +
+      `（${r.mac.toFixed(2)}% MAC）</b> ｜ 横向 <b>${(r.cy >= 0 ? '+' : '')}${r.cy.toFixed(3)} m</b>` +
+      ` ｜ 油量差 <b>${r.imb.toFixed(0)} kg</b></div>` +
+      `<ul>${issues.map((s) => `<li>${s}</li>`).join('')}</ul>` +
+      `<div style="color:var(--text-faint)">允许范围：%MAC ${A.envelope[0]}~${A.envelope[1]}` +
+      ` · 横向 ±${A.y_limit} m · TOW ≤ ${A.mtow} kg · 油量差 ≤ ${A.fuel_imb_limit} kg。</div>`;
+  }
+  $('crash').classList.add('on');
+}
+
+/** 复位：回到初始配载并清除事故状态（课堂演示一次坠机后必须能继续用）。 */
+function resetFlight() {
+  FLIGHT.crashed = false; FLIGHT.state = 'cruise';
+  FLIGHT.pitch = 0; FLIGHT.roll = 0; FLIGHT.alt = 3000; FLIGHT.speed = 460;
+  // 地面事故状态一并清掉：前轮折断进度、卡片标题
+  PARK_BREAK = 0;
+  const c = $('crash'); if (c) c.classList.remove('on');
+  const t = $('crashtitle'); if (t) t.textContent = '飞行事故 · 配载越界';
+  backfillLoadSliders();
+  Object.assign(LOAD.pax, AC.init.pax);
+  Object.assign(LOAD.cargo, AC.init.cargo);
+  Object.assign(LOAD.fuel, AC.init.fuel);
+  buildLoadPanel(); refreshLoad();
+  if ($('f_spd')) { $('f_spd').value = 460; $('f_spdv').textContent = '460'; }
+  if ($('f_imb')) { $('f_imb').value = 100; $('f_imbv').textContent = '100'; }
+}
+
+function updateFlight(dt) {
+  if (MODE !== 'air' || !lastLoad) return;
+  if (FLIGHT.crashed) return;
+  const r = lastLoad, A = AC.aircraft;
+  const s = flightSeverity(r);
+  FLIGHT.sev = s;
+  if (s <= 0.001) {                       // 稳定：姿态回中
+    FLIGHT.pitch += (0 - FLIGHT.pitch) * Math.min(1, dt * 2.5);
+    FLIGHT.roll += (0 - FLIGHT.roll) * Math.min(1, dt * 2.5);
+    FLIGHT.state = 'cruise';
+  } else if (s <= 0.5) {                  // 告警：小幅抖动，提示已贴边
+    FLIGHT.pitch = Math.sin(performance.now() / 240) * 0.03 * s;
+    FLIGHT.state = 'warn';
+  } else {                                // 失稳：发散（按各项越界量分别定强度）
+    // ★ 俯仰只由"重心出包线"驱动、横滚只由"横向出限"驱动 ——
+    //   不能都挂 sign(cy)：严重后重时横向几乎居中，却会滚到 40°（实测踩过）。
+    const outMac = Math.max(A.envelope[0] - r.mac, r.mac - A.envelope[1], 0);
+    const outLat = Math.max(Math.abs(r.cy) - A.y_limit, 0);
+    const kP = Math.min(outMac / 6, 1);                       // 出包线 6 个百分点 → 满强度
+    const kR = Math.min(outLat / 0.30, 1);                    // 横向出限 0.30 m → 满强度
+    const dirP = outMac ? Math.sign(r.mac - (A.envelope[0] + A.envelope[1]) / 2) : 0;
+    FLIGHT.pitch += dirP * kP * s * dt * 0.22 * FF;           // 后重→抬头、前重→低头
+    FLIGHT.roll += -(Math.sign(r.cy) || 1) * kR * s * dt * 0.18 * FF;
+    FLIGHT.alt -= 150 * s * dt * FF;                          // 升力不足/失速 → 掉高度
+    FLIGHT.state = 'unstable';
+  }
+  // 叠加在 applyAttitude 之上（那一层被 ±12° 封顶，这里才允许真正发散）
+  modelRoot.rotation.z += FLIGHT.pitch;
+  modelRoot.rotation.x += FLIGHT.roll;
+  const st = $('fstate');
+  if (st) {
+    st.className = FLIGHT.state;
+    st.textContent = FLIGHT.state === 'cruise' ? '状态：巡航正常'
+      : FLIGHT.state === 'warn' ? `状态：告警 · 越界指数 ${s.toFixed(2)}`
+      : `状态：失稳 · 越界指数 ${s.toFixed(2)} · 高度 ${FLIGHT.alt.toFixed(0)} m`;
+  }
+  if (Math.abs(FLIGHT.pitch) > CRASH_LIM.pitch || Math.abs(FLIGHT.roll) > CRASH_LIM.roll
+      || FLIGHT.alt <= 0) {
+    if (FLIGHT.allowCrash) crashNow();
+  }
+}
+
+// ── 标注避让（屏幕空间贪心剔除）────────────────────────────────────────────
+// 原状：40 条标注同时显示时严重重叠、互相压字，课堂投影下基本不可读。
+// 做法：把每条标注的锚点投到屏幕、算出它在屏幕上的**实际像素尺寸**，按优先级排序
+// （同级比距离），与已放置矩形相撞的直接隐藏。只做显隐、不做位移 ——
+// 引线式排布需要一层 2D 画布，代价与收益不成比例（课堂上只需要"当前看得清哪几条"）。
+const _lA = new THREE.Vector3(), _lB = new THREE.Vector3();
+const _lR = new THREE.Vector3(), _lU = new THREE.Vector3(), _lF = new THREE.Vector3();
+let lblShown = 0, lblTotal = 0;
+
+// 目标屏幕字高（像素）。标注按世界尺寸画时，0.84 m 的文字在 62 m 机位下只有约 11 px
+// —— 这正是原来"标注偏小看不清"的根因（用户最初的反馈）。改成**恒定屏幕字高**：
+// 每条标注按当前机位反算缩放，近处不巨大、远处不消失；同时拆解拉远时字也不缩水。
+const LABEL_PX = 17;
+
+function estLabelSize(o) {
+  if (o.isSprite) {
+    // Sprite 的 scale 已被本函数上一帧改写过，用 userData 里记的原始尺寸算基准
+    const b = o.userData.baseScale || o.scale;
+    return { w: b.x, h: b.y };
+  }
+  const fs = o.fontSize || 0.42, t = o.text || '';
+  let u = 0;
+  for (const ch of t) u += (ch.charCodeAt(0) > 0x2e80 ? 1.02 : 0.56);
+  return { w: Math.max(u, 1) * fs * 1.18, h: fs * 1.35 };   // 1.18 = 描边余量
+}
+
+function layoutLabels() {
+  const W = stage.clientWidth, H = stage.clientHeight;
+  // 注意：extractBasis 的目标向量不能与后面的投影向量复用（曾把 _lA 同时当
+  // "相机前向量"和"锚点投影结果"，结果所有标注算出的屏幕位置都是错的）。
+  camera.matrixWorld.extractBasis(_lR, _lU, _lF);
+  const items = [];
+  let n = 0;
+  for (const o of labelGroup.children) {
+    n++;
+    if (o.isSprite && !o.userData.baseScale) o.userData.baseScale = o.scale.clone();
+    _lA.copy(o.position).project(camera);
+    if (_lA.z > 1) { o.visible = false; continue; }          // 在相机背后
+    const sx = (_lA.x * 0.5 + 0.5) * W, sy = (-_lA.y * 0.5 + 0.5) * H;
+    const sz = estLabelSize(o);
+    // 用"锚点 vs 锚点+相机右向量×宽度"两个投影点算屏幕像素尺寸，自动含透视缩放
+    _lB.copy(o.position).addScaledVector(_lR, sz.w).project(camera);
+    const pw0 = Math.max(Math.abs((_lB.x - _lA.x) * 0.5 * W), 1e-3);
+    _lB.copy(o.position).addScaledVector(_lU, sz.h).project(camera);
+    const ph0 = Math.max(Math.abs((_lB.y - _lA.y) * 0.5 * H), 1e-3);
+    // 归一化到恒定屏幕字高（限幅，避免相机贴脸时缩放爆掉）
+    const k = Math.min(Math.max(LABEL_PX / ph0, 0.35), 8);
+    if (Math.abs((o.userData.k || 0) - k) > 0.02) { o.userData.k = k; o.scale.setScalar(k); }
+    const pw = pw0 * k, ph = ph0 * k;
+    if (sx + pw < 0 || sx - pw > W || sy + ph < 0 || sy - ph > H) { o.visible = false; continue; }
+    items.push({ o, sx, sy, pw, ph, pri: o.userData.pri || 30, d: _lA.z });
+  }
+  items.sort((a, b) => (b.pri - a.pri) || (a.d - b.d));
+  const placed = [];
+  let shown = 0;
+  for (const it of items) {
+    const pad = Math.max(1.5, it.pw * 0.06);
+    const r = { x0: it.sx - it.pw * 0.5 - pad, x1: it.sx + it.pw * 0.5 + pad,
+                y0: it.sy - it.ph * 0.5 - pad, y1: it.sy + it.ph * 0.5 + pad };
+    let hit = false;
+    for (const q of placed) {
+      if (!(r.x1 < q.x0 || r.x0 > q.x1 || r.y1 < q.y0 || r.y0 > q.y1)) { hit = true; break; }
+    }
+    it.o.visible = !hit;
+    if (!hit) { placed.push(r); shown++; }
+  }
+  lblShown = shown; lblTotal = n;
+}
+
+
+// ── 契约 v2：12 波自下而上分层爆炸 ─────────────────────────────────────────
+// 1-7 为竖直主干（自下而上逐层剥离），8-12 为结构展开段（横向件）。
+// 窗口按"每波固定时长 + 相邻重叠"自动推算，保证最后一波正好在 T=1 结束。
+const N_WAVE = 12;
+// 相邻波重叠比例：用户要"一层一层逐层拆解"，所以几乎串行（0.10）——
+// 上一版 0.30 会让相邻两层同时动，看不出"逐层"。
+const WAVE_OVERLAP = 0.10;
+const _w = 1 / (1 + (N_WAVE - 1) * (1 - WAVE_OVERLAP));
+const LAYER_WINDOW = {};
+for (let L = 1; L <= N_WAVE; L++) {
+  const a = (L - 1) * _w * (1 - WAVE_OVERLAP);
+  LAYER_WINDOW[L] = [a, a + _w];
+}
+// 每波位移距离（米）——**运行时按各层实测包络自动推算**，不再手填常数。
+//
+// 为什么要自动推算（踩过的坑）：
+//   上一版把层距手调到 0.55 m，而上壳体自身高 4.22 m。爆炸后
+//   上壳体范围 [1.85, 6.07] 把座椅的 [3.78, 4.74] **整个包住** →
+//   座椅升上去了却完全看不见，即"先炸出来的被后炸出的遮挡"。
+//   结论：**位移必须 ≥ 该层自身厚度 + 间隙**，手调常数永远调不准。
+//
+// 做法：按"堆叠顺序"逐层累加，每层的落位底边 = 上一层落位顶边 + GAP，
+//   从而在竖向**保证层与层不相交**（这就是"逐层拆解"而非"叠在一起"的数学条件）。
+//   位移一律为正 → 满足"全部往上"。
+// ── 每波位移（米）────────────────────────────────────────────────────────
+// 方向来自 GLB 的 lb_dir（语义方向：抽出口 / 左外 / 右外 / 机尾后），此处只给距离。
+// 三条硬约束由 tools/audit_explode.mjs 离线校验：
+//   ① 任何部件不得低于地面水平线；② 部件之间无不合理重叠；③ 每个部件完整可见。
+// 全部运动**都是水平的**（唯一例外是翼内燃油带向上分量），因此约束①天然满足。
+// 关键约束（由 tools/audit_explode.mjs 离线校验，实测迭代得到）：
+//   相邻载荷的抽出距离差**必须大于该件的横向宽度**，否则两个"载荷块"会压在一起。
+//   座椅分区的横向宽度是 2.92 m，所以三区之间必须拉开 ≥3.0 m —— 初版只给了 1.2 m，
+//   审计报出 PAX_0A ∩ PAX_0B 相交 7.2%，据此改成 3.0 m 步距。
+const LAYER_AMP = {
+  1: 3.0, 2: 6.0, 3: 9.0,           // 前/中/后舱座椅（0A/0B/0C）：步距 3.0 m
+  4: 12.0,                          // 行李（1/3 舱）
+  5: 14.5, 6: 17.0, 7: 19.5,        // 货舱 1 / 3 / 5
+  8: 13.0, 9: 13.0,                 // 左 / 右机翼（发动机随翼同移，保持"吊在翼下"）
+  10: 16.0, 11: 16.0,               // 左 / 右翼内燃油（带向上分量，从翼内举出）
+  12: 7.0,                          // 平尾 / 垂尾（向机尾后方）
+};
+let EXPLODE_ENV = null;             // 爆炸后总包络，供相机适配
+
+// ── 剖视（第一段）────────────────────────────────────────────────────────
+// 机身不拆 → 客舱封闭 → 看不见内部。所以第一段先把壳体一侧剖掉，露出客/货舱。
+// 只对"壳体外表面类"的组生效，机翼/发动机/尾翼不剖（否则左翼会被切成半片）。
+const CUT_GROUPS = new Set(['HULL_UPPER', 'DOORS', 'WINDOWS', 'MARKINGS']);
+// 法线 (0,0,-1)：点满足 -z + c < 0 即 z > c 被裁掉 → 裁掉 +Z 侧（左半）。
+// SECTION_Z = 0.15 略过中线，保证中线处的座椅/货箱不被切。
+const SECTION_Z = 0.15;
+const sectionPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), SECTION_Z);
+let CUT_ON = false;
+// 进入页面默认**完整机身**（用户要求：默认看到的是正常飞机，想看内部再手动剖）。
+// 剖视完全由用户按钮控制，显示模式切换不再自动改剖视
+// （旧版"停泊自动剖开、空中自动闭合"的联动已移除——切个场景飞机突然被剖开，反直觉）。
+let CUT_USER = false;
+
+/** 施加剖视状态（1e5 等效于关闭剖面）。由面板按钮与显示模式共同调用。 */
+function applyCut() {
+  sectionPlane.constant = CUT_ON ? SECTION_Z : 1e5;
+  // 停泊面板与拆解面板各有一个剖视开关，状态必须同步
+  for (const id of ['cut', 'cutPark']) {
+    const el = typeof $ === 'function' ? $(id) : null;
+    if (el) el.classList.toggle('on', CUT_ON);
+  }
+}
+const LAYER_NAME = {
+  3: '货舱', 4: '货舱地板', 5: '客舱地板', 6: '座椅', 7: '上壳体',
+  8: '机翼', 9: '燃油', 10: '发动机', 11: '尾翼', 12: '舱门舷窗',
+  1: '起落架', 2: '腹板', 0: '不拆解'
+};
+const SECONDS_TOTAL = 36;                  // 全拆时长（12 层逐层，用户要求"不要太快"）
+const STAGGER_FRAC = 0.45;                 // 层内逐个错峰：占该波窗口的比例
+const smooth = (x) => x * x * (3 - 2 * x);
+/** 单个实例的进度：起点随错峰后移、终点固定，保证所有实例都在该波末端到位 */
+function progIn(t, start, end) {
+  const k = (t - start) / (end - start);
+  return smooth(Math.min(Math.max(k, 0), 1));
+}
+function layerProg(t, layer) {
+  const w = LAYER_WINDOW[layer];
+  if (!w) return 0;
+  return progIn(t, w[0], w[1]);
+}
+
+let T = 0, autoPlay = false, autoDir = 1;
+const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
+
+function applyExplode() {
+  for (const { im, b } of instList) {
+    const win = LAYER_WINDOW[b.layer];
+    const ampMax = LAYER_AMP[b.layer] || 0;
+    const isGear = GEAR_GROUPS.has(b.group);
+    const gk = isGear ? GEAR_T : 0;
+    const scl = gk ? (1 - 0.82 * gk) : 1;
+    for (let i = 0; i < b.items.length; i++) {
+      const it = b.items[i];
+      let amp = 0;
+      if (win && ampMax > 0) {
+        // 层内错峰：起点按 it.stag 后移，终点不变
+        const s = win[0] + (it.stag || 0);
+        if (T > s) amp = ampMax * progIn(T, s, win[1]);
+      }
+      _p.copy(it.pos);
+      if (amp) _p.addScaledVector(b.dir, amp);
+      if (gk) {
+        // ★ 不能用 it.pos.z 判断主起/前起 —— 起落架零件是"几何按世界坐标烘焙、
+        //   对象在原点"（Stage 2 约定），it.pos 恒为 (0,0,0)，sign(it.pos.z) 恒为 0，
+        //   结果主起**根本没收**（实测 gearDiag 全是 装0.00/实0.00 才发现的）。
+        //   必须用**几何中心**的 z。
+        if (b.gz === undefined) {
+          if (!b.geom.boundingBox) b.geom.computeBoundingBox();
+          b.gz = b.geom.boundingBox.getCenter(new THREE.Vector3()).z;
+        }
+        if (Math.abs(b.gz) > 2.2) {                    // 主起（几何 |z|≈3.8）→ 向内收进腹部整流罩
+          _p.z += -Math.sign(b.gz) * 2.5 * gk;
+          _p.y += 0.30 * gk;
+        } else {                                       // 前起（几何 z≈0）→ 向上收进前机身
+          _p.y += 0.95 * gk;
+        }
+      }
+      // 与拆解无关的**实时标注**位移：始终跟随配载计算结果，不受 T 影响
+      if (b.group === 'ANNO_CG') _p.x += CG_DX;      // 重心标记沿机身滑动
+      if (it.name === 'YPointer') _p.z += LAT_Z;     // 横向游标沿标尺滑动
+      // 地面事故：前轮折断 —— 支柱压扁下沉，机头随之砸到机坪上
+      if (PARK_BREAK > 0.002 && (it.name.startsWith('GN') || it.name === 'GWN' || it.name === 'GWN_B')) {
+        _s.multiplyScalar(1 - 0.82 * PARK_BREAK);
+        _p.y -= 0.55 * PARK_BREAK;
+      }
+      if (scl !== 1) _s.copy(it.scl).multiplyScalar(scl); else _s.copy(it.scl);
+      _m.compose(_p, it.quat, _s);
+      im.setMatrixAt(i, _m);
+    }
+    im.instanceMatrix.needsUpdate = true;
+    if (isGear) {                            // 收起时淡出到**完全透明**（0.08 仍会浮在机翼上）
+      im.material.transparent = true;
+      im.material.opacity = Math.max(0, 1 - gk / 0.9);
+      im.material.depthWrite = gk < 0.02;
+    }
+  }
+  // 风扇必须跟着发动机走（发动机随翼外移时不能把风扇留在原地）。
+  // 注意：位移必须乘**进度** progIn(T,...)，与 applyExplode 完全同源——
+  // 之前这里直接取满位移 LAYER_AMP，结果组装态(T=0)风扇就已经跑到 13 m 外，
+  // 表现为"短舱前悬着一个孤零零的风扇盘"（已踩过）。
+  for (const f of FANS) {
+    const win = LAYER_WINDOW[f.bucket.layer];
+    const am = LAYER_AMP[f.bucket.layer] || 0;
+    const amp = win ? am * progIn(T, win[0], win[1]) : 0;
+    f.fan.position.copy(f.fan.userData.base);
+    if (amp) f.fan.position.addScaledVector(f.bucket.dir, amp);
+  }
+  for (const spr of labelGroup.children) {          // 吊牌跟着所属拆解组一起走
+    const fg = spr.userData.follow;
+    if (!fg) continue;
+    const hit = instList.find((x) => x.b.group === fg);
+    let amp = 0;
+    if (hit) {
+      const win = LAYER_WINDOW[hit.b.layer];
+      const am = LAYER_AMP[hit.b.layer] || 0;
+      if (win) amp = am * progIn(T, win[0], win[1]);
+    }
+    spr.position.copy(spr.userData.base);
+    if (hit) spr.position.addScaledVector(hit.b.dir, amp);
+  }
+  // HUD 显示当前波次
+  const cur = Math.min(N_WAVE, Math.max(1, Math.floor(T / (_w * (1 - WAVE_OVERLAP))) + 1));
+  const el = $('h_wave');
+  if (el) el.textContent = T <= 0.001 ? '组装态'
+    : T >= 0.999 ? '全拆' : `第 ${cur}/${N_WAVE} 波 ${LAYER_NAME[cur] || ''}`;
+}
+
+// ── 面板 ───────────────────────────────────────────────────────────────────
+const groupBox = new Map(), layerBox = new Map(), srcBox = new Map();
+const groupOrder = [];
+
+function buildPanelUI() {
+  const groups = [...groupStat.entries()].sort((a, b) =>
+    (a[1].layer - b[1].layer) || a[0].localeCompare(b[0]));
+  const palette = ['#185fa5', '#1d9e75', '#ba7517', '#d4537e', '#7f77dd', '#0f6e56',
+                   '#993c1d', '#378add', '#639922', '#888780'];
+  const host = $('groups');
+  groups.forEach(([g, st], i) => {
+    groupOrder.push(g);
+    groupBox.set(g, true);
+    const el = document.createElement('label');
+    el.className = 'grp';
+    el.innerHTML = `<input type="checkbox" checked><span class="dot" ` +
+      `style="background:${palette[i % palette.length]}"></span>` +
+      `<span class="nm">${g}</span><span class="ct">${st.count}</span>`;
+    el.querySelector('input').addEventListener('change', (e) => {
+      groupBox.set(g, e.target.checked); refreshVisibility();
+    });
+    host.appendChild(el);
+  });
+
+  const layHost = $('layers');
+  [...new Set([...groupStat.values()].map((s) => s.layer))].sort((a, b) => a - b).forEach((L) => {
+    layerBox.set(L, true);
+    const b = document.createElement('button');
+    b.className = 'on';
+    b.textContent = `L${L} ${LAYER_NAME[L] || ''}`;
+    b.addEventListener('click', () => {
+      const on = !layerBox.get(L);
+      layerBox.set(L, on);
+      b.classList.toggle('on', on);
+      for (const [g, st] of groupStat) if (st.layer === L) groupBox.set(g, on);
+      syncChecks();
+      refreshVisibility();
+    });
+    layHost.appendChild(b);
+  });
+
+  const srcHost = $('srclist');
+  for (const [s, n] of srcStat) {
+    srcBox.set(s, true);
+    const b = document.createElement('button');
+    b.className = 'on';
+    b.textContent = `${s} (${n})`;
+    b.addEventListener('click', () => {
+      const on = !srcBox.get(s);
+      srcBox.set(s, on);
+      b.classList.toggle('on', on);
+      refreshVisibility();
+    });
+    srcHost.appendChild(b);
+  }
+
+  $('all').onclick = () => { for (const g of groupBox.keys()) groupBox.set(g, true); syncChecks(); refreshVisibility(); };
+  $('none').onclick = () => { for (const g of groupBox.keys()) groupBox.set(g, false); syncChecks(); refreshVisibility(); };
+  $('solo').onclick = () => {
+    for (const [g] of groupBox) groupBox.set(g, groupStat.get(g).layer === 4);
+    syncChecks(); refreshVisibility();
+  };
+  $('anno').onclick = () => {
+    labelGroup.visible = !labelGroup.visible;
+    $('anno').classList.toggle('on', labelGroup.visible);
+  };
+
+  // 统一信息面板的折叠 / 展开。收起后只留左上角一枚小胶囊，
+  // 三维视图里**看不到任何遮挡物**（这是用户明确的硬要求）。
+  {
+    const bar = $('infobar'), btn = $('infotog');
+    const setCollapsed = (on) => {
+      bar.classList.toggle('collapsed', on);
+      btn.textContent = on ? '展开' : '收起';
+      btn.title = on ? '展开信息面板' : '折叠信息面板（收起后不遮挡飞机）';
+    };
+    btn.onclick = () => setCollapsed(!bar.classList.contains('collapsed'));
+  }
+
+  // Blender 里那块 100×70 的深色地面默认关掉 —— 已用程序化网格 + 接影面替代。
+  // 需要对照原样时可在这里勾回来。
+  if (groupBox.has('ENV_GROUND')) {
+    groupBox.set('ENV_GROUND', false);
+    syncChecks();
+  }
+  // %MAC 教学标尺（ANNO_SCALE：MACBar 长条 + 刻度 + Band + 横向游标 YPointer 等）
+  // 默认隐藏 —— 它是原模型自带的教学叠层，横在翼根旁/浮在空中都会被误认为"多余结构件"。
+  // 重心数值在右侧面板 KPI 里实时显示；需要看这根标尺时，在「拆解演示 → 拆解组」里勾回 ANNO_SCALE。
+  if (groupBox.has('ANNO_SCALE')) {
+    groupBox.set('ANNO_SCALE', false);
+    syncChecks();
+  }
+
+  document.querySelectorAll('#views button').forEach((b) => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#views button').forEach((x) => x.classList.remove('on'));
+      b.classList.add('on');
+      gotoView(b.dataset.v);
+    });
+  });
+  document.querySelector('#views button[data-v="home"]').classList.add('on');
+
+  // 剖视开关：直接改剖面常数（1e5 = 等效关闭）。停泊与拆解面板各一个入口，逻辑相同
+  const toggleCut = () => { CUT_USER = true; CUT_ON = !CUT_ON; applyCut(); };
+  $('cut').onclick = toggleCut;
+  const cutPark = $('cutPark');
+  if (cutPark) cutPark.onclick = toggleCut;
+  applyCut();
+  // 两段式演示
+  $('s1').onclick = () => { CUT_ON = true; applyCut(); setT(0); };
+  $('s2').onclick = () => { CUT_ON = true; applyCut(); setT(100); };
+}
+
+function syncChecks() {
+  document.querySelectorAll('#groups .grp input').forEach((el, i) => {
+    el.checked = groupBox.get(groupOrder[i]) !== false;
+  });
+}
+
+function refreshVisibility() {
+  for (const { im, b } of instList) {
+    im.visible = (groupBox.get(b.group) !== false) && (srcBox.get(b.src) !== false);
+  }
+}
+
+// 相机适配：本版运动是**水平**的，包络主要向左右两侧扩张（约 37.6 m → 68 m），
+// 所以判据要看水平跨度而不是竖向（竖向判据是 v2.2 向上阶梯的遗留，已不适用）。
+let FIT_DIST = 0;
+let ZOOM_AT_T1 = 1;
+let ENV_MID = null;
+function syncZoomToExplode() {
+  if (!FIT_DIST) return;
+  const t = Math.min(Math.max(T, 0), 1);
+  controls.dollyTo(FIT_DIST * (1 + (ZOOM_AT_T1 - 1) * t), false);
+  // 注视点从"组装态中心"平滑移到"爆炸包络中心"；再加**双模式的机体抬升量**
+  // —— 空中模式机体上移 6.5 m，注视点不动就会把飞机顶出画面（已踩过）。
+  const c = VIEW_CENTER;
+  const lift = modelRoot ? modelRoot.position.y : 0;
+  if (ENV_MID) {
+    controls.moveTo(c.x + (ENV_MID.x - c.x) * t,
+                    c.y + lift + (ENV_MID.y - c.y) * t,
+                    c.z + (ENV_MID.z - c.z) * t, false);
+  } else {
+    controls.moveTo(c.x, c.y + lift, c.z, false);
+  }
+}
+
+function fitCamera() {
+  const size = modelBox.getSize(new THREE.Vector3());
+  const c = modelBox.getCenter(new THREE.Vector3());
+  const hSpan = Math.max(size.x, size.z);
+  const r = Math.max(size.x, size.y, size.z) * 0.5;
+  const dist = r / Math.tan((camera.fov * Math.PI / 180) / 2) * 1.45;
+  if (EXPLODE_ENV) {
+    ENV_MID = EXPLODE_ENV.getCenter(new THREE.Vector3());
+    const es = EXPLODE_ENV.getSize(new THREE.Vector3());
+    ZOOM_AT_T1 = Math.max(Math.max(es.x, es.z), es.y) / Math.max(hSpan, size.y);
+  }
+  camera.near = Math.max(dist / 300, 0.05);
+  camera.far = dist * 14;
+  camera.updateProjectionMatrix();
+  FIT_DIST = dist;                        // 组装态距离；爆炸时由 syncZoomToExplode 按需拉远
+  VIEW_HOME = { pos: [c.x + dist * 0.62, c.y + dist * 0.36, c.z + dist * 0.72],
+                tgt: [c.x, c.y, c.z] };
+  VIEW_CENTER = c.clone();
+  VIEW_RADIUS = dist;
+  controls.setLookAt(VIEW_HOME.pos[0], VIEW_HOME.pos[1], VIEW_HOME.pos[2],
+                     VIEW_HOME.tgt[0], VIEW_HOME.tgt[1], VIEW_HOME.tgt[2], false);
+}
+
+// 预设视角：0.5s 缓动切换，配合讲稿逐段讲解
+let VIEW_HOME = null, VIEW_CENTER = null, VIEW_RADIUS = 40;
+
+/**
+ * 把相机对准某个组（?focus=组名&dist=倍率）。
+ * 为什么需要它：全景截图的分辨率下**根本分不清零件细节**——"发动机进气口的风扇盘到底
+ * 有没有装在短舱里"这个问题，靠肉眼看全景图猜了四轮都没猜对，最后是 dump 出零件坐标
+ * （tools/dump_group.mjs）才定案。有了定点相机，这类验证变成一次渲染的事。
+ */
+function focusGroup(grp, k = 3.0, from = null) {
+  const box = new THREE.Box3();
+  const _mm = new THREE.Matrix4();
+  let any = false;
+  for (const { b } of instList) {
+    if (b.group !== grp) continue;
+    if (!b.geom.boundingBox) b.geom.computeBoundingBox();
+    for (const it of b.items) {
+      _mm.compose(it.pos, it.quat, it.scl);
+      box.union(new THREE.Box3().copy(b.geom.boundingBox).applyMatrix4(_mm));
+      any = true;
+    }
+  }
+  if (!any) return false;
+  // 关键：实例坐标是**装配态**的，而 modelRoot 可能带着抬升（空中模式 +6.5 m）和姿态旋转。
+  // 不世界化就会把镜头对到模型下方（实测：空中模式下发动机跑到画面顶边被裁）。
+  modelRoot.updateMatrixWorld(true);
+  box.applyMatrix4(modelRoot.matrixWorld);
+  const c = box.getCenter(new THREE.Vector3());
+  const r = Math.max(box.getSize(new THREE.Vector3()).length() * 0.5, 0.4);
+  const d = r / Math.tan((camera.fov * Math.PI / 180) / 2) * k;
+  // from 可指定观察方向（如正对进气口看风扇）；默认右前上方
+  const dir = from && from.length === 3
+    ? new THREE.Vector3(from[0], from[1], from[2]).normalize()
+    : new THREE.Vector3(0.62, 0.36, 0.72).normalize();
+  controls.setLookAt(c.x + dir.x * d, c.y + dir.y * d, c.z + dir.z * d, c.x, c.y, c.z, false);
+  return true;
+}
+
+function gotoView(name) {
+  if (!VIEW_HOME) return;
+  const c = VIEW_CENTER, d = VIEW_RADIUS;
+  const V = {
+    home:  [VIEW_HOME.pos, VIEW_HOME.tgt],
+    side:  [[c.x, c.y + d * 0.04, c.z + d * 1.05], [c.x, c.y, c.z]],
+    top:   [[c.x, c.y + d * 1.15, c.z + 0.01], [c.x, c.y, c.z]],
+    nose:  [[c.x + d * 0.92, c.y + d * 0.24, c.z + d * 0.32], [c.x + d * 0.30, c.y, c.z]],
+    cargo: [[c.x - d * 0.34, c.y - d * 0.44, c.z + d * 0.52], [c.x - d * 0.20, c.y - d * 0.14, c.z]],
+    cabin: [[c.x + d * 0.28, c.y + d * 0.50, c.z + d * 0.46], [c.x + d * 0.10, c.y + d * 0.06, c.z]]
+  }[name];
+  if (!V) return;
+  controls.setLookAt(V[0][0], V[0][1], V[0][2], V[1][0], V[1][1], V[1][2], true);
+}
+
+// ── 交互 ───────────────────────────────────────────────────────────────────
+function setT(v) {
+  T = v / 100;
+  $('t').value = v;
+  $('tv').textContent = v;
+  $('h_t').textContent = v + '%';
+  autoPlay = false;
+  $('auto').classList.remove('on');
+  syncZoomToExplode();          // 预设按钮也按当前进度适配镜头
+}
+$('t').addEventListener('input', (e) => setT(+e.target.value));
+document.querySelectorAll('[data-t]').forEach((b) =>
+  b.addEventListener('click', () => setT(+b.dataset.t)));
+$('auto').addEventListener('click', () => {
+  autoPlay = !autoPlay;
+  $('auto').classList.toggle('on', autoPlay);
+});
+$('clip').addEventListener('input', (e) => {
+  const v = +e.target.value;
+  if (v === 0) { clipPlane.constant = 1e5; $('cv').textContent = '关'; }
+  else {
+    const a = modelBox.min.x, b2 = modelBox.max.x;
+    clipPlane.constant = b2 - (b2 - a) * (v / 100) * 1.04;
+    $('cv').textContent = clipPlane.constant.toFixed(1) + ' m';
+  }
+});
+
+// URL 参数：便于无头自检、课堂一键切场景、分享特定视图
+//   ?t=100            拆解进度
+//   ?labels=1         显示标注层
+//   ?hide=A,B         隐藏指定拆解组
+//   ?show=A,B         只显示指定拆解组
+//   ?src=AC_ROOT      只显示指定来源根
+function applyUrlParams() {
+  const q = new URLSearchParams(location.search);
+  // 场景优先：?scene=air|park|strip —— 同时展开对应参数组并切到该环境模式
+  if (q.has('scene')) setScene(q.get('scene'));
+  if (q.has('t')) setT(Math.max(0, Math.min(100, +q.get('t') || 0)));
+  if (q.get('labels') === '1') {
+    labelGroup.visible = true;
+    $('anno').classList.add('on');
+  }
+  if (q.has('show')) {
+    const want = new Set(q.get('show').split(',').map((s) => s.trim()).filter(Boolean));
+    for (const g of groupBox.keys()) groupBox.set(g, want.has(g));
+    syncChecks();
+  }
+  if (q.has('hide')) {
+    for (const g of q.get('hide').split(',').map((s) => s.trim())) {
+      if (groupBox.has(g)) groupBox.set(g, false);
+    }
+    syncChecks();
+  }
+  if (q.has('src')) {
+    const want = q.get('src');
+    for (const s of srcBox.keys()) srcBox.set(s, s === want);
+    document.querySelectorAll('#srclist button').forEach((b, i) => {
+      b.classList.toggle('on', [...srcBox.values()][i]);
+    });
+  }
+  if (q.has('view')) {
+    gotoView(q.get('view'));
+    document.querySelectorAll('#views button').forEach((x) => {
+      x.classList.toggle('on', x.dataset.v === q.get('view'));
+    });
+  }
+  // 载重预设（点击按钮走的是同一条路径，保证与手动操作完全一致）
+  if (q.has('preset')) {
+    const btn = document.querySelector(`[data-p="${q.get('preset')}"]`);
+    if (btn) btn.click();
+  }
+  // 飞行工况预设（走按钮同一条路径，与手动点击完全等价）
+  if (q.has('flight')) {
+    const btn = document.querySelector(`[data-f="${q.get('flight')}"]`);
+    if (btn) btn.click();
+  }
+  // 显示模式：停泊 / 空中
+  if (q.has('mode') && (q.get('mode') === 'air' || q.get('mode') === 'park')) {
+    try {
+      setMode(q.get('mode'));
+      // 无头验证时不必等 2.2 s 的收放过渡，直接置到位
+      if (q.has('instant')) {
+        GEAR_T = q.get('mode') === 'air' ? 1 : 0;
+        modelRoot.position.y = q.get('mode') === 'air' ? 6.5 : 0;
+        syncZoomToExplode();     // 直接置位时也必须让相机跟上（animate 里的跟随分支不会触发）
+      }
+    } catch (e) {
+      console.warn('显示模式切换失败（三维仍可用）：', e);
+    }
+  }
+  // 定点相机：?focus=组名[&dist=倍率&from=x,y,z] —— 用于无头验证零件级细节（见 focusGroup 注释）
+  if (q.has('focus')) {
+    try {
+      const fv = q.get('from');
+      focusGroup(q.get('focus'), Number(q.get('dist')) || 3.0,
+                 fv ? fv.split(',').map(Number) : null);
+    }     catch (e) { console.warn('定点相机失败（不影响其他功能）：', e); }
+  }
+  // 剖视开关（显式指定，优先级高于模式默认值）：?cut=0 关闭 / ?cut=1 打开
+  if (q.has('cut')) {
+    CUT_USER = true;                        // 显式指定 = 用户意志，模式切换不再覆盖
+    CUT_ON = q.get('cut') !== '0';
+    applyCut();
+  }
+  refreshVisibility();
+}
+
+window.addEventListener('resize', () => {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+});
+
+// ═══════════════ 载重参数实时联动 ═══════════════════════════════════════
+// 计算逻辑**严格镜像** scripts/a320_data.py 的 compute()，口径由 scripts/export_groups.py
+// 导出的 groups.json 提供（唯一数据源）。两边若不一致，3D 与面板会各说各话。
+let AC = null;
+const LOAD = { pax: {}, cargo: {}, fuel: {} };
+let SEL = null;
+const PZ = { FWD: 'PAX_0A', MID: 'PAX_0B', AFT: 'PAX_0C' };
+const PC = { FWD: 'CARGO_1', AFT: 'CARGO_3', BULK: 'CARGO_5' };
+const PF = { WING_L: 'FUEL_WING_L', WING_R: 'FUEL_WING_R', CTR: 'FUEL_CTR' };
+
+const PRESETS = {
+  normal: { pax: { FWD: 40, MID: 60, AFT: 35 }, cargo: { FWD: 1800, AFT: 2200, BULK: 400 },
+            fuel: { WING_L: 4200, WING_R: 4300, CTR: 3500 } },
+  fwd:    { pax: { FWD: 72, MID: 0, AFT: 0 },   cargo: { FWD: 3175, AFT: 0, BULK: 0 },
+            fuel: { WING_L: 7500, WING_R: 7500, CTR: 0 } },
+  aft:    { pax: { FWD: 0, MID: 0, AFT: 66 },   cargo: { FWD: 0, AFT: 4480, BULK: 1495 },
+            fuel: { WING_L: 0, WING_R: 0, CTR: 6145 } },
+  left:   { pax: { FWD: 40, MID: 60, AFT: 35 }, cargo: { FWD: 1800, AFT: 2200, BULK: 400 },
+            fuel: { WING_L: 7500, WING_R: 300, CTR: 2200 } },
+  right:  { pax: { FWD: 40, MID: 60, AFT: 35 }, cargo: { FWD: 1800, AFT: 2200, BULK: 400 },
+            fuel: { WING_L: 300, WING_R: 7500, CTR: 2200 } },
+};
+
+function computeLoad() {
+  const A = AC.aircraft;
+  // 防 NaN 守卫：数据表缺一个字段（例如 y 没导出）就会让 my → NaN → 姿态角 NaN
+  // → modelRoot 变换矩阵失效 → 整个模型从画面消失。这类故障极难从截图看出原因，
+  // 所以这里逐字段兜底（已踩过：加了 y 字段却没重跑导出脚本，模型凭空消失）。
+  const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
+  const items = [{ label: 'OEW 使用空机', w: num(A.oew), st: num(A.oew_station), y: 0,
+                   group: null, kind: 'oew' }];
+  for (const zk of Object.keys(LOAD.pax)) {
+    const z = AC.zones[zk], n = num(LOAD.pax[zk]);
+    items.push({ label: z.label + ' 旅客', w: n * num(A.pax_std_w), st: num(z.station), y: num(z.y),
+                 group: PZ[zk], kind: 'payload' });
+    // 行李站位：a320_data 里 FWD 行李走前货舱、其余（MID/AFT）走后货舱 —— 必须照搬
+    const bk = zk === 'FWD' ? 'FWD' : 'AFT';
+    items.push({ label: z.label + ' 行李', w: n * num(A.bag_std_w), st: num(AC.cargo[bk].station),
+                 y: num(AC.cargo[bk].y), group: zk === 'FWD' ? 'BAG_1' : 'BAG_3', kind: 'payload' });
+  }
+  for (const ck of Object.keys(LOAD.cargo))
+    items.push({ label: AC.cargo[ck].label, w: num(LOAD.cargo[ck]), st: num(AC.cargo[ck].station),
+                 y: num(AC.cargo[ck].y), group: PC[ck], kind: 'payload' });
+  for (const fk of Object.keys(LOAD.fuel))
+    items.push({ label: AC.fuel[fk].label, w: num(LOAD.fuel[fk]), st: num(AC.fuel[fk].station),
+                 y: num(AC.fuel[fk].y), group: PF[fk], kind: 'system' });
+  const tow = items.reduce((s, i) => s + i.w, 0);
+  const mom = items.reduce((s, i) => s + i.w * i.st, 0);
+  const my = items.reduce((s, i) => s + i.w * i.y, 0);
+  const cg = tow ? mom / tow : 0, cy = tow ? my / tow : 0;
+  const fuel = num(LOAD.fuel.WING_L) + num(LOAD.fuel.WING_R) + num(LOAD.fuel.CTR);
+  return { items, tow, mom, my, cg, cy, mac: (cg - num(A.lemac)) / num(A.mac, 1) * 100,
+           fuel, zfw: tow - fuel, imb: Math.abs(num(LOAD.fuel.WING_L) - num(LOAD.fuel.WING_R)) };
+}
+
+/** 姿态联动：俯仰由 %MAC 驱动、横滚由横向 CG 驱动（幅度封顶 ±12°，教学示意） */
+function applyAttitude(r) {
+  const A = AC.aircraft;
+  const [lo, hi] = A.envelope;
+  let pitch = 0;
+  if (r.mac < lo) pitch = 0.035 * (lo - r.mac);        // 前重 → 低头（负）
+  else if (r.mac > hi) pitch = -0.040 * (r.mac - hi);  // 后重 → 抬头（正）
+  // 符号约定：机头 +X、上方 +Y。绕 +Z 正转使机头抬起 → 抬头为正。
+  const roll = -0.12 * r.cy;
+  // 绕 +X 正转会把 +Z（左翼）压低 → 正 = 左倾。CG 偏右(cy>0) 时取负 = 右倾（右侧重、右翼下沉）。
+  const lim = 12 * Math.PI / 180;
+  // 拆解时姿态淡出：整体旋转会让已抽出的部件跟着转，观感很怪
+  const k = Math.max(0, 1 - T);
+  modelRoot.rotation.set(
+    THREE.MathUtils.clamp(roll, -lim, lim) * k, 0,
+    THREE.MathUtils.clamp(pitch, -lim, lim) * k);
+}
+
+function kpiSet(id, val, cls) {
+  const el = $(id);
+  if (!el) return;
+  el.querySelector('b').textContent = val;
+  const box = el;
+  box.classList.remove('ok', 'bad', 'warn');
+  if (cls) box.classList.add(cls);
+}
+
+function refreshLoad() {
+  const r = computeLoad();
+  lastLoad = r;
+  const A = AC.aircraft;
+  kpiSet('k_tow', r.tow.toFixed(0) + ' kg', r.tow > A.mtow ? 'bad' : null);
+  kpiSet('k_zfw', r.zfw.toFixed(0) + ' kg', r.zfw > A.mzfw ? 'bad' : null);
+  const okMac = r.mac >= A.envelope[0] && r.mac <= A.envelope[1];
+  kpiSet('k_mac', r.mac.toFixed(2) + ' %', okMac ? null : 'bad');
+  kpiSet('k_y', (r.cy >= 0 ? '+' : '') + r.cy.toFixed(3) + ' m',
+         Math.abs(r.cy) <= A.y_limit ? null : 'bad');
+  kpiSet('k_imb', r.imb.toFixed(0) + ' kg', r.imb <= A.fuel_imb_limit ? null : 'warn');
+  const att = (r.mac < A.envelope[0] ? '前重·低头' : r.mac > A.envelope[1] ? '后重·抬头' : '俯仰可配平')
+    + ' / ' + (Math.abs(r.cy) < 0.05 ? '横向居中' : (r.cy > 0 ? 'CG偏右·右倾' : 'CG偏左·左倾'));
+  kpiSet('k_att', att, (!okMac || Math.abs(r.cy) > A.y_limit) ? 'bad' : null);
+  applyAttitude(r);
+  applyLiveLabels(r);          // 3D 里的动态标注（重心标记/横向游标/数值）接实时值
+  renderCard();
+}
+
+function buildLoadPanel() {
+  const host = $('loadpanel');
+  // ★ 必须先清空：本函数会被多处反复调用（初始化、每次点预设、复位…），
+  //   直接 append 会把整套滑块越叠越多 —— 用户截图里"参数重复叠加十几份"就是这个。
+  host.innerHTML = '';
+  const add = (grp, lab, key, cat, max, step) => {
+    const d = document.createElement('div');
+    d.className = 'lrow';
+    d.innerHTML = `<label>${lab}</label><input type="range" min="0" max="${max}" step="${step}" ` +
+                  `value="${LOAD[cat][key]}" data-cat="${cat}" data-key="${key}">` +
+                  `<span class="v"></span>`;
+    const inp = d.querySelector('input'), v = d.querySelector('.v');
+    const upd = () => { v.textContent = inp.value; };
+    inp.addEventListener('input', () => {
+      LOAD[cat][key] = +inp.value; upd();
+      document.querySelectorAll('[data-p]').forEach((b) => b.classList.remove('on'));
+      refreshLoad();
+    });
+    upd(); host.appendChild(d);
+  };
+  const h = (t) => { const e = document.createElement('div'); e.className = 'lgrp'; e.textContent = t; host.appendChild(e); };
+  h('客舱旅客（人）');
+  add('pax', '前舱 0A', 'FWD', 'pax', AC.zones.FWD.seats_full, 1);
+  add('pax', '中舱 0B', 'MID', 'pax', AC.zones.MID.seats_full, 1);
+  add('pax', '后舱 0C', 'AFT', 'pax', AC.zones.AFT.seats_full, 1);
+  h('货舱（kg）');
+  add('cargo', '1 舱 前货舱', 'FWD', 'cargo', AC.cargo.FWD.max, 25);
+  add('cargo', '3 舱 后货舱', 'AFT', 'cargo', AC.cargo.AFT.max, 25);
+  add('cargo', '5 舱 散货舱', 'BULK', 'cargo', AC.cargo.BULK.max, 25);
+  h('燃油（kg）');
+  add('fuel', '左翼油箱', 'WING_L', 'fuel', AC.fuel.WING_L.max, 50);
+  add('fuel', '右翼油箱', 'WING_R', 'fuel', AC.fuel.WING_R.max, 50);
+  add('fuel', '中央油箱', 'CTR', 'fuel', AC.fuel.CTR.max, 50);
+
+  document.querySelectorAll('[data-p]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const p = PRESETS[b.dataset.p];
+      Object.assign(LOAD.pax, p.pax); Object.assign(LOAD.cargo, p.cargo); Object.assign(LOAD.fuel, p.fuel);
+      document.querySelectorAll('[data-p]').forEach((x) => x.classList.remove('on'));
+      b.classList.add('on');
+      // 只回填既有滑块，**不要重建面板**（重建会叠加，且面板在停泊场景内、空中看不到）
+      backfillLoadSliders();
+      // 预设参数卡：只显示这一个预设的参数，几秒后自动收起（用户要求的展示方式）
+      showPresetCard('预设 · ' + b.textContent.trim());
+      refreshLoad();
+    });
+  });
+}
+
+// ── 点击查看 ────────────────────────────────────────────────────────────
+let lastLoad = null;
+const _rc = new THREE.Raycaster();
+const _pt = new THREE.Vector2();
+
+function selectGroup(g) {
+  SEL = g;
+  for (const { im, b } of instList) {
+    const on = b.group === g;
+    im.material.emissive.setHex(on ? 0x1a5580 : 0x000000);
+    im.material.emissiveIntensity = on ? 0.6 : 0;
+  }
+  renderCard();
+}
+
+function renderCard() {
+  const t = document.querySelector('#card .ct');
+  const b = document.querySelector('#card .cb');
+  if (!AC) return;
+  if (!SEL) {
+    t.textContent = '点击机体任意部件查看';
+    b.innerHTML = '左键点击三维视图中的部件 → 显示名称、类别、站位与当前装载下的力矩贡献。';
+    return;
+  }
+  const meta = AC.groups[SEL] || { label: SEL, kind: 'unknown', note: '（未在数据表中登记）' };
+  const KIND = { payload: '业载', system: '系统', structure: '结构', annotation: '标注', env: '环境' };
+  t.innerHTML = meta.label + `<span class="tag">${KIND[meta.kind] || meta.kind}</span>`;
+  const rows = [];
+  if (meta.station != null) rows.push(`站位 Arm <b>${meta.station.toFixed(2)}</b> m（自机头 DATUM）`);
+  if (meta.rows) rows.push(`分区 <b>${meta.rows}</b> 排 ｜ 满员 <b>${meta.capacity}</b> 座`);
+  if (meta.hold) rows.push(`货舱 <b>${meta.hold}</b> ｜ 限重 <b>${meta.limit_kg}</b> kg`);
+  if (meta.limit_kg && !meta.hold) rows.push(`限重 <b>${meta.limit_kg}</b> kg`);
+  // 当前装载下的该组贡献
+  if (lastLoad) {
+    const mine = lastLoad.items.filter((i) => i.group === SEL);
+    if (mine.length) {
+      const w = mine.reduce((s, i) => s + i.w, 0);
+      const m = mine.reduce((s, i) => s + i.w * i.st, 0);
+      const share = lastLoad.mom ? (m / lastLoad.mom * 100) : 0;
+      rows.push(`当前重量 <b>${w.toFixed(0)}</b> kg ｜ 力矩 <b>${m.toFixed(0)}</b> kg·m ` +
+                `（占总力矩 <b>${share.toFixed(1)}%</b>）`);
+      // 该组对 %MAC 的拉动：去掉该组后的 %MAC 变化
+      const tw = lastLoad.tow - w, tm = lastLoad.mom - m;
+      if (tw > 0) {
+        const mac0 = (lastLoad.cg - AC.aircraft.lemac) / AC.aircraft.mac * 100;
+        const mac1 = ((tm / tw) - AC.aircraft.lemac) / AC.aircraft.mac * 100;
+        const d = mac0 - mac1;
+        rows.push(`移除它后 %MAC <b>${d >= 0 ? '+' : ''}${d.toFixed(2)}</b> 个百分点` +
+                  `（即它在把重心往${d >= 0 ? '后' : '前'}拉）`);
+      }
+    } else if (meta.kind === 'structure' || meta.kind === 'system') {
+      const A = AC.aircraft;
+      if (SEL === 'HULL_UPPER' || /^(WING_|ENG_|TAIL_|GEAR_|DOORS|WINDOWS|MARKINGS|BELLY|FLOOR)/.test(SEL)) {
+        rows.push(`属 OEW（使用空机 ${A.oew.toFixed(0)} kg，重心 ${A.oew_mac_pct.toFixed(1)}% MAC），不随装载变化`);
+      }
+    }
+  }
+  b.innerHTML = rows.map((r) => '· ' + r).join('<br>') +
+    `<br><span style="color:#6b7788">${meta.note || ''}</span>`;
+}
+
+function initPicker() {
+  let down = null;
+  const el = renderer.domElement;
+  el.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
+  el.addEventListener('pointerup', (e) => {
+    if (!down) return;
+    // 拖拽旋转不应触发拾取：位移超过 5px 视为拖拽
+    if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) { down = null; return; }
+    down = null;
+    const r = el.getBoundingClientRect();
+    _pt.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+    _pt.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+    _rc.setFromCamera(_pt, camera);
+    const hits = _rc.intersectObjects(instList.map((x) => x.im), false);
+    if (!hits.length) { selectGroup(null); return; }
+    selectGroup(hits[0].object.userData.lb_group);
+  });
+}
+
+async function initLoad() {
+  AC = window.__GROUPS__ || await (await fetch('./groups.json')).json();
+  Object.assign(LOAD.pax, AC.init.pax);
+  Object.assign(LOAD.cargo, AC.init.cargo);
+  Object.assign(LOAD.fuel, AC.init.fuel);
+  buildLoadPanel();
+  initPicker();
+  initScenePanels();       // 场景折叠面板（静态停泊 / 空中飞行 / 拆解演示）
+  initFlightUI();          // 飞行工况（极端工况 / 允许坠机 / 复位）
+  refreshLoad();
+  const q = new URLSearchParams(location.search);
+  if (q.has('pick')) selectGroup(q.get('pick'));
+}
+
+// 调试出口：打包成 IIFE 后内部变量在外部取不到，无头自检需要它才能读状态。
+window.__LB_DEBUG__ = () => ({
+  T: +T.toFixed(3),
+  cam: camera.position.toArray().map((v) => +v.toFixed(2)),
+  visible: instList.filter((x) => x.im.visible).length,
+  total: instList.length,
+  rot: [+modelRoot.rotation.x.toFixed(4), +modelRoot.rotation.z.toFixed(4)],
+  env: EXPLODE_ENV
+    ? EXPLODE_ENV.min.toArray().map((v) => +v.toFixed(1))
+        .concat(EXPLODE_ENV.max.toArray().map((v) => +v.toFixed(1)))
+    : null,
+  modelBox: modelBox.min.toArray().map((v) => +v.toFixed(1))
+    .concat(modelBox.max.toArray().map((v) => +v.toFixed(1))),
+  zoom: +ZOOM_AT_T1.toFixed(3),
+  mid: ENV_MID ? ENV_MID.toArray().map((v) => +v.toFixed(2)) : null,
+  dist: +FIT_DIST.toFixed(1),
+  sel: SEL, card: (document.querySelector('#card .ct') || {}).textContent,
+  // 双模式诊断
+  mode: MODE, gearT: +GEAR_T.toFixed(3), lift: +modelRoot.position.y.toFixed(2),
+  fans: FANS.length, fanPos: FANS.map((f) => f.fan.position.toArray().map((v) => +v.toFixed(2))),
+  envPark: envPark.visible, envAirVisible: envAir.visible, clouds: envAir.children.length,
+  cut: [+CUT_ON, CUT_USER, +sectionPlane.constant.toFixed(2)],
+  // 批次2 · 天空/环境诊断：当前天空模式、程序化环境是否生效、背景类型
+  sky: skyMode, envOn: !!(scene.environment && scene.environment.isTexture),
+  bg: scene.background && scene.background.isTexture ? 'tex' : 'color',
+  exposure: +renderer.toneMappingExposure.toFixed(2),
+  // 动态标注诊断：CG 标记位移、横向游标位移、避让后可见数/总数
+  cgDx: +CG_DX.toFixed(3), latZ: +LAT_Z.toFixed(3),
+  // 飞行工况：[状态, 越界指数, 俯仰rad, 横滚rad, 是否已坠机]
+  flight: [FLIGHT.state, +FLIGHT.sev.toFixed(3), +FLIGHT.pitch.toFixed(3),
+           +FLIGHT.roll.toFixed(3), FLIGHT.crashed ? 1 : 0],
+  fstate: (document.getElementById('fstate') || {}).textContent || '',
+  annoScaleOff: groupBox.get('ANNO_SCALE') === false ? 1 : 0,   // 1 = %MAC 标尺已默认隐藏
+  // 风扇半径（毂半径 / 0.30 反推）—— 应 ≈0.84，小于唇口内缘 0.93 才不会被挡住
+  fanR: (FANS[0] ? +(FANS[0].fan.children[0].geometry.parameters.radiusTop / 0.30).toFixed(3) : 0),
+  fanSpin: +FAN_SPIN.toFixed(2),   // 停泊应恒为 0（不转）
+  // 云贴图左下角 alpha：应 = 0；>0 说明还有"方形灰底"（方块瑕疵的量化指标）
+  cloudCornerA: (() => {
+    try {
+      if (!CLOUD_TEX) return -1;
+      return CLOUD_TEX.image.getContext('2d').getImageData(2, 509, 1, 1).data[3];
+    } catch (e) { return -2; }
+  })(),
+  presetCard: (() => {                 // 预设参数卡（应只出现一张，且几秒后自动收起）
+    const cs = document.querySelectorAll('.presetcard.on');
+    return cs.length + '张/' + (cs[0] ? cs[0].textContent.slice(0, 26) : '');
+  })(),
+  sliders: document.querySelectorAll('#loadpanel .lrow').length,   // 应恒为 9，多则说明叠加
+  // 屏幕射线网格：对屏幕逐点射线并报告首个命中件 —— 用于把截图上的某个
+  // "多出来的部分"精确归因到具体物体（肉眼/截图都定位不到时用这个）。
+  rayGrid: (() => {
+    const out = [], rc = new THREE.Raycaster(), pt = new THREE.Vector2();
+    const seen = {};
+    for (let iy = 0; iy < 5; iy++) {
+      for (let ix = 0; ix < 7; ix++) {
+        pt.x = (ix + 0.5) / 7 * 2 - 1;
+        pt.y = -(iy + 0.5) / 5 * 2 + 1;
+        rc.setFromCamera(pt, camera);
+        const hits = rc.intersectObjects(instList.filter((x) => x.im.visible).map((x) => x.im), false);
+        if (!hits.length) continue;
+        const g = hits[0].object.userData.lb_group || '?';
+        const key = g + '@' + ix + ',' + iy;
+        seen[key] = (seen[key] || 0) + 1;
+        if (!out.some((s) => s.startsWith(g + '@' + ix + ',' + iy))) {
+          out.push(g + '@' + ix + ',' + iy);
+        }
+      }
+    }
+    return out.slice(0, 20);
+  })(),
+  // 发动机相关全部零件名（查"清理清单漏删的旧件"）
+  engParts: (() => {
+    const out = [];
+    for (const { b } of instList) {
+      for (const it of b.items) {
+        if (/^(E_|Plane_Eng|Plane_Pylon|E_L|E_R|T_L|T_R)/.test(it.name)) out.push(it.name);
+      }
+    }
+    return out;
+  })(),
+  boxesNear: (() => {
+    const out = [];
+    const bb = new THREE.Box3(), v = new THREE.Vector3(), m4 = new THREE.Matrix4();
+    for (const { im, b } of instList) {
+      if (!im.visible) continue;
+      if (!b.geom.boundingBox) b.geom.computeBoundingBox();
+      bb.copy(b.geom.boundingBox);
+      let mn = null, mx = null;
+      for (const it of b.items) {
+        m4.compose(it.pos, it.quat, it.scl);
+        const t = new THREE.Box3().copy(bb).applyMatrix4(m4);
+        mn = mn ? mn.min(t) : t.min.clone();
+        mx = mx ? mx.max(t) : t.max.clone();
+      }
+      if (!mn) continue;
+      v.copy(mn).add(mx).multiplyScalar(0.5);
+      if (v.x > -3 && v.x < 5 && Math.abs(v.z) > 1.5 && Math.abs(v.z) < 8) {
+        out.push(b.group + '/' + b.items[0].name +
+                 ' c=[' + v.x.toFixed(1) + ',' + v.y.toFixed(1) + ',' + v.z.toFixed(1) + ']' +
+                 ' s=[' + (mx.x - mn.x).toFixed(1) + ',' + (mx.y - mn.y).toFixed(1) + ',' + (mx.z - mn.z).toFixed(1) + ']');
+      }
+    }
+    return out.slice(0, 14);
+  })(),
+  gearDiag: (() => {
+    const out = [];
+    for (const { im, b } of instList) {
+      if (b.group !== 'GEAR_WHEEL') continue;
+      im.getMatrixAt(0, _m);
+      out.push(b.items[0].name + ' 装' + b.items[0].pos.z.toFixed(2) +
+               ' 实' + _m.elements[14].toFixed(2));
+    }
+    return out.slice(0, 3);
+  })(),
+  labels: [lblShown, lblTotal, labelGroup.visible ? 1 : 0],
+  labelsShown: labelGroup.visible
+    ? labelGroup.children.filter((o) => o.visible).map((o) => o.userData.lb_label).slice(0, 14)
+    : [],
+  liveText: ['TY_cur', 'UI_DYN', 'CG_LIVE'].map((n) => {
+    const o = lbGet(n); return o ? (o.userData.txt || o.text || '') : null;
+  }),
+  fwd: (() => { const v = new THREE.Vector3(); camera.getWorldDirection(v);
+                return v.toArray().map((x) => +x.toFixed(3)); })(),
+});
+
+// ═══════════════ 双模式：停泊 / 空中 ═══════════════════════════════════
+// 停泊：机场停机坪（程序化画停机位标线）+ 远景跑道，起落架放下
+// 空中：收起落架 + 云端飞行（云团 Sprite）+ 发动机转动 + 抬升高度
+// 全部用程序化贴图/几何，零外部资源，单文件离线交付继续成立。
+let MODE = 'park';
+let GEAR_T = 0;            // 0 = 放下，1 = 收起
+let FAN_SPIN = 0;          // 风扇累计转角
+let CLOUD_TEX = null;      // 云贴图留引用：自检探针要读它的角点 alpha（应=0，否则有方形灰底）
+const FANS = [];
+
+/** 确定性伪随机：保证每次打开同一 URL 得到同一片云，便于截图比对 */
+function makeRng(seed) {
+  let s = seed >>> 0;
+  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+}
+
+/** 停机坪地面：程序化画出机位引导线、停止线、边线 */
+function makeApronTexture() {
+  const S = 2048;
+  const cv = document.createElement('canvas'); cv.width = cv.height = S;
+  const g = cv.getContext('2d');
+  const rng = makeRng(20260924);
+  // ── 1) 水泥基底：每 4 m（=128px）一个板块，板块间给轻微色差（3~6m 分格要求内）──
+  // 轮次2：基底整体压暗 ~10%（#8f949a→#81858b），消除正午白爆；标线/边框颜色不动
+  g.fillStyle = '#81858b'; g.fillRect(0, 0, S, S);
+  const PANEL = 128;
+  for (let py = 0; py < S; py += PANEL) {
+    for (let px = 0; px < S; px += PANEL) {
+      const v = (rng() - 0.5) * 16;
+      g.fillStyle = v > 0 ? `rgba(255,255,255,${v / 255})` : `rgba(0,0,0,${-v / 255})`;
+      g.fillRect(px, py, PANEL, PANEL);
+    }
+  }
+  // ── 2) 污渍：大面积水渍/油渍（径向渐变，低透明）──
+  for (let i = 0; i < 30; i++) {
+    const x = rng() * S, y = rng() * S, r = 70 + rng() * 240;
+    const dark = rng() > 0.42;
+    const grd = g.createRadialGradient(x, y, 0, x, y, r);
+    grd.addColorStop(0, dark ? `rgba(28,30,34,${0.05 + rng() * 0.08})`
+                             : `rgba(255,255,255,${0.035 + rng() * 0.05})`);
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grd; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+  }
+  // ── 3) 板缝：主缝 4m 深 + 2m 次缝极浅 ──
+  g.strokeStyle = 'rgba(0,0,0,0.20)'; g.lineWidth = 3;
+  for (let i = 0; i <= S; i += PANEL) {
+    g.beginPath(); g.moveTo(i, 0); g.lineTo(i, S); g.stroke();
+    g.beginPath(); g.moveTo(0, i); g.lineTo(S, i); g.stroke();
+  }
+  g.strokeStyle = 'rgba(0,0,0,0.07)'; g.lineWidth = 2;
+  for (let i = PANEL / 2; i < S; i += PANEL) {
+    g.beginPath(); g.moveTo(i, 0); g.lineTo(i, S); g.stroke();
+    g.beginPath(); g.moveTo(0, i); g.lineTo(S, i); g.stroke();
+  }
+  // ── 4) 麻点 ──
+  for (let i = 0; i < 9000; i++) {
+    const a = 0.03 + rng() * 0.05;
+    g.fillStyle = rng() > 0.5 ? `rgba(255,255,255,${a})` : `rgba(0,0,0,${a})`;
+    g.fillRect(rng() * S, rng() * S, 2 + rng() * 3, 2 + rng() * 3);
+  }
+  // ── 5) 机位标线（方向与机头一致）────────────────────────────────────────
+  // 画布 → 世界映射：画布 X → 世界 +X；画布 Y 向上 → 世界 −Z
+  // （apron 摆放：rotation.x=-π/2、position=(APRON_X,-3.42,0)、64×64，与 APRON_X 是一对）
+  const CX = (wx) => ((wx - APRON_X) / 64 + 0.5) * S;
+  const CY = (wz) => ((-wz) / 64 + 0.5) * S;
+  g.lineCap = 'round';
+  // 轮胎擦痕：进位线两侧的黑擦痕 + 停止线前的刹车弧（低透明、重复叠几道）
+  for (const off of [-1.15, 1.15]) {
+    for (let k = 0; k < 3; k++) {
+      g.strokeStyle = `rgba(25,27,30,${0.08 + rng() * 0.06})`;
+      g.lineWidth = 14 + rng() * 12;
+      g.beginPath();
+      g.moveTo(CX(39), CY(off + (rng() - 0.5) * 0.5));
+      g.quadraticCurveTo(CX(30), CY(off * 1.35), CX(23.5 + rng()), CY(off * 0.8));
+      g.stroke();
+    }
+  }
+  for (let k = 0; k < 4; k++) {                                  // 停止线前的轮胎 scrub
+    g.strokeStyle = `rgba(25,27,30,${0.07 + rng() * 0.05})`;
+    g.lineWidth = 16 + rng() * 14;
+    g.beginPath();
+    g.arc(CX(22.4), CY((rng() - 0.5) * 2.2), 30 + rng() * 26, Math.PI * (0.1 + rng() * 0.2), Math.PI * (0.7 + rng() * 0.2));
+    g.stroke();
+  }
+  // 黄色引入线 + 停止线（沿用批次1的走向）
+  g.strokeStyle = '#e8c33c'; g.lineWidth = 14;
+  g.beginPath(); g.moveTo(CX(38), CY(0)); g.lineTo(CX(22.6), CY(0)); g.stroke();
+  g.lineWidth = 12;
+  g.beginPath(); g.moveTo(CX(22.6), CY(-3.4)); g.lineTo(CX(22.6), CY(3.4)); g.stroke();
+  // 机位中心延长线（白色虚线）
+  g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 8; g.setLineDash([26, 22]);
+  g.beginPath(); g.moveTo(CX(22.6), CY(0)); g.lineTo(CX(-19), CY(0)); g.stroke();
+  g.setLineDash([]);
+  // 机位边框（白色）+ 红色安全边框（绕机位一圈，内侧）
+  g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 7;
+  g.strokeRect(CX(-22), CY(-13), CX(20) - CX(-22), CY(13) - CY(-13));
+  g.strokeStyle = 'rgba(200,54,44,.85)'; g.lineWidth = 6;
+  g.strokeRect(CX(-20.5), CY(-11.5), CX(18.5) - CX(-20.5), CY(11.5) - CY(-11.5));
+  // 机位编号（纯数字，不用真实机场标识）+ STOP 字样
+  g.fillStyle = '#e8c33c';
+  g.font = 'bold 150px "Segoe UI", sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('101', CX(27.0), CY(-7.5));
+  g.font = 'bold 62px "Segoe UI", sans-serif';
+  g.fillText('STOP', CX(27.8), CY(7.0));
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  return t;
+}
+
+/** 机坪粗糙度贴图（与 makeApronTexture 同一映射）：标线区 0.7、裸水泥 0.95、板缝更毛。
+ *  粗糙度分层是"水泥地而不是塑料地"的关键 —— 漆线被磨得发亮，裸水泥吸光。 */
+function makeApronRoughnessTexture() {
+  const S = 1024;                        // 粗糙度不需要 2K
+  const cv = document.createElement('canvas'); cv.width = cv.height = S;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#f2f2f2'; g.fillRect(0, 0, S, S);                  // ≈0.95
+  const CX = (wx) => ((wx - APRON_X) / 64 + 0.5) * S;
+  const CY = (wz) => ((-wz) / 64 + 0.5) * S;
+  // 板缝更毛（≈1.0）
+  g.strokeStyle = '#fcfcfc'; g.lineWidth = 2;
+  for (let i = 0; i <= S; i += 64) {
+    g.beginPath(); g.moveTo(i, 0); g.lineTo(i, S); g.stroke();
+    g.beginPath(); g.moveTo(0, i); g.lineTo(S, i); g.stroke();
+  }
+  // 标线区（≈0.7，磨亮的漆）
+  g.strokeStyle = '#b3b3b3'; g.fillStyle = '#b3b3b3'; g.lineCap = 'round';
+  g.lineWidth = 8;
+  g.beginPath(); g.moveTo(CX(38), CY(0)); g.lineTo(CX(22.6), CY(0)); g.stroke();
+  g.beginPath(); g.moveTo(CX(22.6), CY(-3.4)); g.lineTo(CX(22.6), CY(3.4)); g.stroke();
+  g.lineWidth = 4; g.setLineDash([14, 11]);
+  g.beginPath(); g.moveTo(CX(22.6), CY(0)); g.lineTo(CX(-19), CY(0)); g.stroke();
+  g.setLineDash([]);
+  g.lineWidth = 4;
+  g.strokeRect(CX(-22), CY(-13), CX(20) - CX(-22), CY(13) - CY(-13));
+  g.strokeRect(CX(-20.5), CY(-11.5), CX(18.5) - CX(-20.5), CY(11.5) - CY(-11.5));
+  g.font = 'bold 80px "Segoe UI", sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('101', CX(27.0), CY(-7.5));
+  g.font = 'bold 34px "Segoe UI", sans-serif';
+  g.fillText('STOP', CX(27.8), CY(7.0));
+  return new THREE.CanvasTexture(cv);
+}
+
+/** 远景跑道：沥青 + 中线虚线 + 边线 + 接地带 */
+function makeRunwayTexture() {
+  const W = 256, H = 2048;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#3f444a'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#e9e9e2';
+  for (let y = 60; y < H; y += 150) g.fillRect(W / 2 - 8, y, 16, 84);     // 中线虚线
+  g.fillRect(18, 0, 8, H); g.fillRect(W - 26, 0, 8, H);                   // 边线
+  for (let i = 0; i < 6; i++) {                                          // 接地带
+    g.fillRect(52 + i * 22, 120, 12, 200); g.fillRect(W - 64 - i * 22, 120, 12, 200);
+    g.fillRect(52 + i * 22, H - 320, 12, 200); g.fillRect(W - 64 - i * 22, H - 320, 12, 200);
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  return t;
+}
+
+/** 天空渐变：顶部偏深蓝、近地平线转亮灰 —— 空中模式作 scene.background。
+ *  纯色背景会让"在云端飞行"变成"在灰纸上飞"（第一版就是这样，很空）。 */
+function makeSkyTexture() {
+  const cv = document.createElement('canvas'); cv.width = 8; cv.height = 256;
+  const g = cv.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 0, 256);
+  grd.addColorStop(0.00, '#4d7fae');
+  grd.addColorStop(0.42, '#8fb6d4');
+  grd.addColorStop(0.72, '#cfe0ea');
+  grd.addColorStop(1.00, '#eef3f6');
+  g.fillStyle = grd; g.fillRect(0, 0, 8, 256);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** 云团贴图：多个径向渐变叠加，输出带透明通道的软云。
+ *  分辨率提到 512（原来 256 在近处会糊成一片），并让 46 团半径/透明度都有梯度，
+ *  避免"每朵云长得一样"的重复感 —— 这也是"质感偏假"的一部分。 */
+function makeCloudTexture(seed) {
+  const S = 512;
+  const cv = document.createElement('canvas'); cv.width = cv.height = S;
+  const g = cv.getContext('2d');
+  const rng = makeRng(seed);
+  for (let i = 0; i < 46; i++) {
+    const x = 70 + rng() * (S - 140), y = 110 + rng() * (S - 220);
+    const r = (40 + rng() * 96) * (0.6 + 0.4 * (1 - Math.abs(x / S - 0.5) * 2));
+    const a0 = 0.72 + rng() * 0.26;
+    const grd = g.createRadialGradient(x, y, 0, x, y, r);
+    grd.addColorStop(0.00, 'rgba(255,255,255,' + a0.toFixed(3) + ')');
+    grd.addColorStop(0.35, 'rgba(255,255,255,' + (a0 * 0.52).toFixed(3) + ')');
+    grd.addColorStop(0.72, 'rgba(255,255,255,' + (a0 * 0.18).toFixed(3) + ')');
+    grd.addColorStop(1.00, 'rgba(255,255,255,0)');
+    g.fillStyle = grd; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+  }
+  // 顶部再压一层淡影，让云有体积而不是一团纯白。
+  // ★ 必须用 **source-atop**：它只影响"已经画上去的像素"。
+  //   上一版直接 fillRect(0,0,S,S) —— 把整个画布下半涂成半透明灰**矩形**，
+  //   每朵云精灵都带一块方形灰底，空中画面出现明显方块瑕疵（用户反馈的问题 3）。
+  g.globalCompositeOperation = 'source-atop';
+  const sh = g.createLinearGradient(0, S * 0.55, 0, S);
+  sh.addColorStop(0, 'rgba(190,205,220,0)');
+  sh.addColorStop(1, 'rgba(170,190,210,0.30)');
+  g.fillStyle = sh; g.fillRect(0, 0, S, S);
+  g.globalCompositeOperation = 'source-over';
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.magFilter = THREE.LinearFilter;
+  t.anisotropy = 4;
+  CLOUD_TEX = t;                 // 留引用给自检探针（读角点 alpha）
+  return t;
+}
+
+const envPark = new THREE.Group();
+const envAir = new THREE.Group();
+envAir.visible = false;
+scene.add(envPark, envAir);
+
+// 停机坪中心（与 makeApronTexture 里的 CX() 映射必须一致，两者是一对）
+const APRON_X = 6;
+const GY = -3.42;                 // 地坪高度（停机坪面）
+const RWY_START = 60;             // 跑道起点：在停止线（x=22.6）的**另一侧**
+
+/** 玻璃幕墙/窗带贴图：横向明框 + 玻璃反光渐变。
+ *  没有它，大面积玻璃就是一块纯色板 —— 这正是"像积木"的一部分。 */
+function makeWindowTexture(tint, cols, rows) {
+  const cw = 32, ch = 32;
+  const cv = document.createElement('canvas');
+  cv.width = cols * cw; cv.height = rows * ch;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#2e3a47';                    // 竖挺（暗）
+  g.fillRect(0, 0, cv.width, cv.height);
+  const c = new THREE.Color(tint);
+  for (let r = 0; r < rows; r++) {
+    for (let q = 0; q < cols; q++) {
+      const x = q * cw + 3, y = r * ch + 5, w = cw - 6, h = ch - 10;
+      // 每格给一点随机反光差异，避免整片死板
+      const k = 0.72 + ((q * 7 + r * 13) % 9) / 22;
+      const gr = g.createLinearGradient(x, y, x + w, y + h);
+      gr.addColorStop(0, '#' + c.clone().multiplyScalar(k * 1.25).getHexString());
+      gr.addColorStop(0.55, '#' + c.clone().multiplyScalar(k).getHexString());
+      gr.addColorStop(1, '#' + c.clone().multiplyScalar(k * 0.62).getHexString());
+      g.fillStyle = gr;
+      g.fillRect(x, y, w, h);
+    }
+    g.fillStyle = 'rgba(226,233,240,0.55)';   // 横向明框
+    g.fillRect(0, r * ch + ch - 7, cv.width, 3.5);
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  return t;
+}
+
+function matWin(tint, cols = 3, rows = 2) {
+  const t = makeWindowTexture(tint, cols, rows);
+  t.repeat.set(6, 2);
+  return new THREE.MeshStandardMaterial({
+    map: t, color: 0xffffff, roughness: 0.28, metalness: 0.45,
+  });
+}
+
+/** 横向窗带贴图（批次3）：重复玻璃条带 + 层间楼板线 —— 比"方格栏杆图"更接近真实航站楼主立面。 */
+function makeBandTexture(tint, bands) {
+  const W = 512, H = bands * 64;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#313d49'; g.fillRect(0, 0, W, H);            // 层间楼板（暗）
+  const c = new THREE.Color(tint);
+  for (let b = 0; b < bands; b++) {
+    const y = b * 64 + 8, h = 48;
+    // 每条玻璃带：竖向明框分格 + 斜向反光
+    for (let x = 0; x < W; x += 42) {
+      const k = 0.7 + ((x * 7 + b * 13) % 9) / 24;
+      const gr = g.createLinearGradient(x, y, x + 42, y + h);
+      gr.addColorStop(0, '#' + c.clone().multiplyScalar(k * 1.3).getHexString());
+      gr.addColorStop(0.6, '#' + c.clone().multiplyScalar(k).getHexString());
+      gr.addColorStop(1, '#' + c.clone().multiplyScalar(k * 0.55).getHexString());
+      g.fillStyle = gr;
+      g.fillRect(x + 2, y, 38, h);
+    }
+    g.fillStyle = 'rgba(226,233,240,0.5)';
+    g.fillRect(0, y + h, W, 3);                               // 带下沿明框线
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  return t;
+}
+function matBand(tint, bands, rx, ry) {
+  const t = makeBandTexture(tint, bands);
+  t.repeat.set(rx, ry);
+  return new THREE.MeshStandardMaterial({
+    map: t, color: 0xffffff, roughness: 0.30, metalness: 0.42,
+  });
+}
+
+/** 门牌/编号贴图：白底蓝字（程序化，零外部资源） */
+function makeSignTexture(text) {
+  const cv = document.createElement('canvas');
+  cv.width = 340; cv.height = 220;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#f4f6f8'; g.fillRect(0, 0, cv.width, cv.height);
+  g.strokeStyle = '#2f6f9f'; g.lineWidth = 8;
+  g.strokeRect(6, 6, cv.width - 12, cv.height - 12);
+  g.fillStyle = '#1f4e79';
+  g.font = 'bold 76px "Microsoft YaHei", sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, cv.width / 2, cv.height / 2);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** 程序化机场要素：航站楼 / 登机口 / 廊桥 / 塔台 / 地勤车辆 / 标志灯光。
+ *  全部低模 + 程序化材质，**零外部资源**（与本项目"单文件离线"的硬指标一致）。
+ *  放在视图侧而不是 GLB 里 —— 这样配载/拆解的教学模型体积不受环境影响。 */
+function buildAirportStructures(parent) {
+  const G = new THREE.Group();
+  parent.add(G);
+  const M = (c, r = 0.92, m = 0.0) =>
+    new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
+  // 轮次2：环境整体冷灰蓝化 —— 白飞机要从背景里"浮"出来，航站楼不能比飞机还亮
+  const conc = M(0x9aa4ae), glass = M(0x5b7488, 0.22, 0.60),
+        steel = M(0x7a838c, 0.62, 0.50), dark = M(0x444a51, 0.85),
+        roofM = M(0x5d6772, 0.52, 0.38);      // 屋盖/檐口：比混凝土深一档，拉开层次
+  const TW = 190, TD = 44, TZ = -68;
+  const ARM_Z0 = TZ + TD / 2 + 8;             // 廊桥起点（指廊端）
+  const ARM_Z1 = -2.6;                        // 桥臂终点（贴机门）
+  const ARM_ZC = (ARM_Z0 + ARM_Z1) / 2;
+
+  const box = (w, h, d, mat, x, y, z, ry = 0) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z); m.rotation.y = ry;
+    m.castShadow = true; m.receiveShadow = true;
+    G.add(m); return m;
+  };
+  const cyl = (rt, rb, h, mat, x, y, z, seg = 16) => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat);
+    m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
+    G.add(m); return m;
+  };
+
+  // ── 航站楼（−Z 侧；默认机位从 +Z 看，它在飞机后方，不挡前视）───────────
+  // 原状：190×24×42 的一个混凝土方块 + 一块玻璃 + 一条屋檐 = 典型"积木堆砌"。
+  // 重做的四个要点：
+  //   ① **分层轮廓**：裙房基座 → 玻璃幕墙主体 → 中央抬高的大厅 → 拱形屋盖 → 陆侧雨棚
+  //   ② **立面细节**：幕墙用窗格贴图（横向明框）、裙房走水平窗带、加壁柱分缝
+  //   ③ **材质区分**：混凝土（粗糙）/ 玻璃（低粗糙·高金属）/ 屋盖金属 / 雨棚钢结构
+  //   ④ **破除体块**：空侧伸出一根指廊接登机口，陆侧挑出雨棚
+  // （TW / TD / TZ 与 ARM_* 常量在上方材质区已声明，这里不要重复声明 —— esbuild 会报
+  //   "The symbol has already been declared"，且这种错只在打包时才暴露。）
+  const winLand = matWin(0x9db4c8, 3, 3);
+  // 批次3：主立面改用**横向窗带**（重复玻璃条带 + 层间腰线），比格子窗更真实；
+  // 屋顶挑檐出挑、空侧立柱按节奏排布，破除"灰盒+栏杆"。
+  const bandAir = matBand(0x7fa3c4, 3, 7, 1);      // 空侧主立面（3 条玻璃带）
+  const bandHall = matBand(0x8ab0d0, 2, 4, 1);     // 中央大厅
+  box(TW, 6.5, TD, conc, 10, GY + 3.25, TZ);                            // 裙房基座
+  box(TW - 4, 3.6, 0.35, winLand, 10, GY + 3.5, TZ - TD / 2 - 0.2);     // 陆侧水平窗带
+  box(TW, 15, TD - 7, glass, 10, GY + 6.5 + 7.5, TZ);                   // 主体（玻璃幕墙）
+  box(TW - 5, 13.2, 0.35, bandAir, 10, GY + 6.5 + 7.2, TZ + (TD - 7) / 2 + 0.25); // 空侧横向窗带
+  box(TW - 4, 0.9, 0.6, conc, 10, GY + 13.6, TZ + (TD - 7) / 2 + 0.35); // 层间腰线（浅色横带）
+  box(TW + 2, 0.7, 1.6, roofM, 10, GY + 21.4, TZ + (TD - 7) / 2 + 0.7); // 玻璃面上口挑檐
+  for (let i = -4; i <= 4; i++) {                                        // 壁柱：破除长条玻璃面
+    box(0.9, 15, 0.9, steel, 10 + i * 21, GY + 6.5 + 7.5, TZ + (TD - 7) / 2);
+  }
+  for (let i = -8; i <= 8; i++) {                                        // 裙房柱廊节奏（10m）
+    box(0.7, 6.5, 0.7, conc, 10 + i * 11, GY + 3.25, TZ + TD / 2 - 0.6);
+  }
+  box(64, 9, TD - 2, conc, 6, GY + 21.5 + 4.5, TZ);                     // 中央抬高的大厅体块
+  box(62, 7.2, 0.35, bandHall, 6, GY + 24.2, TZ + (TD - 2) / 2 + 0.25);
+  {                                                                     // 拱形屋盖（半圆柱沿 X）
+    const v = new THREE.Mesh(
+      new THREE.CylinderGeometry((TD - 2) / 2, (TD - 2) / 2, TW - 3, 30, 1, false, 0, Math.PI), roofM);
+    v.rotation.z = Math.PI / 2;                    // 轴转到 X、壳面朝 +Y
+    v.position.set(10, GY + 31.0, TZ);
+    v.castShadow = true; v.receiveShadow = true;
+    G.add(v);
+  }
+  box(TW + 6, 1.2, TD + 5, roofM, 10, GY + 21.5 + 9.6, TZ);              // 主体檐口
+  box(TW * 0.9, 0.55, 2.2, steel, 10, GY + 6.9, TZ + TD / 2 + 0.6);      // 裙房挑檐
+  // 陆侧雨棚 + 柱子
+  box(TW * 0.72, 0.8, 9, steel, 6, GY + 8.2, TZ - TD / 2 - 5);
+  for (let i = -3; i <= 3; i++) box(0.6, 8.2, 0.6, steel, 6 + i * 22, GY + 4.1, TZ - TD / 2 - 8.6);
+  // 空侧指廊（伸向停机坪，接登机口）
+  box(16, 9, 26, conc, 16, GY + 4.5, TZ + TD / 2 + 12);
+  box(15, 5.5, 0.35, bandAir, 16, GY + 6.2, TZ + TD / 2 + 24.7);
+  box(17, 0.9, 27.5, roofM, 16, GY + 9.2, TZ + TD / 2 + 12);              // 指廊挑檐
+
+  // ── 登机口 + 廊桥（批次3 重做）：旋转厅 → 折线通道 → 靠机端遮雨棚+活动地板 ──
+  // 对接 L1 门（three 坐标）：x 10.5~11.5、y −0.5~1.23、z −1.5~−2.0（蒙皮在 z≈−1.95）。
+  // 廊道地板取 y=−0.38（略低于门槛），内端留在蒙皮外 0.3 m 以上，不穿机身。
+  // 旋转厅 r≈1.5、高 3.2，贴指廊端面（z=−21）；通道 3 段微折，升降立柱撑在中段。
+  {
+    const bPanelM = M(0xaab3bc, 0.75, 0.08);
+    const bBand = matBand(0x8fb4d4, 1, 5, 1);          // 通道侧窗带（单条玻璃带重复）
+    cyl(1.5, 1.5, 3.2, bPanelM, 11.5, 1.22, -20.8);    // 旋转厅
+    cyl(1.72, 1.72, 0.2, steel, 11.5, 2.93, -20.8);    // 厅顶盖
+    cyl(0.9, 0.9, 0.5, dark, 11.5, 0.02, -20.8, 12);   // 厅基座转盘
+    const tube = (x1, z1, x2, z2) => {                 // 一段方管通道：箱体 + 双侧窗带
+      const dx = x2 - x1, dz = z2 - z1;
+      const L = Math.hypot(dx, dz), ry = Math.atan2(dx, dz);
+      const cx = (x1 + x2) / 2, cz = (z1 + z2) / 2;
+      box(2.5, 2.5, L, bPanelM, cx, 0.87, cz, ry);
+      const ox = Math.cos(ry) * 1.27, oz = -Math.sin(ry) * 1.27;
+      box(0.07, 0.85, L, bBand, cx + ox, 1.05, cz + oz, ry);
+      box(0.07, 0.85, L, bBand, cx - ox, 1.05, cz - oz, ry);
+    };
+    tube(11.5, -20.8, 11.6, -13.5);                    // A 段：出旋转厅
+    tube(11.6, -13.5, 11.2, -7.0);                     // B 段：微折向机身
+    tube(11.2, -7.0, 11.0, -3.9);                      // C 段：靠机
+    box(3.0, 3.0, 2.7, bPanelM, 11.0, 1.12, -3.75);    // 靠机舱（cab）
+    box(3.4, 0.16, 2.3, steel, 11.0, 2.72, -3.3);      // 遮雨棚（挑在舱门前上方）
+    {                                                  // 活动地板：斜搭到门槛的 ramp
+      const ramp = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.1, 1.9), dark);
+      ramp.position.set(11.0, -0.5, -2.85);
+      ramp.rotation.x = 0.10;
+      ramp.castShadow = true; G.add(ramp);
+    }
+    cyl(0.32, 0.46, 3.0, steel, 11.4, -1.92, -9.2);    // 升降立柱（撑 B/C 段交接）
+    box(1.3, 0.3, 1.0, dark, 11.4, GY + 0.55, -9.2);   // 立柱行走底盘
+  }
+  // 登机口门号牌（程序化贴图，零外部资源）
+  {
+    const g = new THREE.PlaneGeometry(3.4, 2.2);
+    const m = new THREE.MeshBasicMaterial({ map: makeSignTexture('A1 登机口'), transparent: true });
+    const s = new THREE.Mesh(g, m);
+    s.position.set(13.5, GY + 10.6, -22.6);
+    G.add(s);
+  }
+
+  // ── 塔台：基座 + 锥形筒身 + 八边形指挥室（原状是三个圆柱，太像积木）──
+  const TX = -72, TZ2 = 84;
+  {
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(7.6, 8.8, 10, 8), conc);
+    b.position.set(TX, GY + 5, TZ2); b.castShadow = true; b.receiveShadow = true; G.add(b);
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(7.75, 7.75, 3.6, 8, 1, true), winLand);
+    w.position.set(TX, GY + 5.6, TZ2); G.add(w);
+    const r = new THREE.Mesh(new THREE.CylinderGeometry(9.0, 9.0, 0.6, 8), roofM);
+    r.position.set(TX, GY + 10.3, TZ2); G.add(r);
+  }
+  cyl(2.05, 3.7, 33, conc, TX, GY + 10 + 16.5, TZ2, 24);                 // 筒身（下粗上细，24 段消棱）
+  for (let i = 0; i < 4; i++) {                                          // 筒身竖线，破除光筒
+    const a = i * Math.PI / 2 + Math.PI / 4;
+    box(0.5, 33, 0.5, steel, TX + Math.cos(a) * 2.7, GY + 10 + 16.5, TZ2 + Math.sin(a) * 2.7);
+  }
+  cyl(5.3, 5.3, 0.6, steel, TX, GY + 42.7, TZ2, 8);                      // 指挥室底板
+  cyl(5.0, 4.4, 6.6, glass, TX, GY + 46.3, TZ2, 8);                      // 八边形指挥室
+  cyl(5.75, 5.75, 0.7, roofM, TX, GY + 49.6, TZ2, 8);                    // 挑檐
+  cyl(0.35, 0.35, 5.4, steel, TX, GY + 52.6, TZ2, 8);                    // 天线杆
+  {                                                                      // 塔顶障碍灯（自发光小球）
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffcf6a }));
+    b.position.set(TX, GY + 55.6, TZ2);
+    G.add(b);
+  }
+
+  // ── 地勤车辆（批次3 重做）：4 种可辨认低模车，共享 5 份材质，每种 ≤300 三角面 ──
+  // 站位原则：勤务集中在机体左侧（−Z，靠航站楼/廊桥一侧），引导车机头前方。
+  // ★ 轮次2：删除配餐车与加油车 —— 实测二者与左右发动机短舱相交
+  //   （配餐车主厢 x4.1~8.9/z−3.5~−5.7 交左发前下角；加油车罐体 z5.65~7.35 交右发），
+  //   且加油车车顶高于短舱底，任何摆位都穿模。现只保留已核实不相交的 ①②⑤。
+  const vehW = M(0xdfe3e8, 0.55, 0.05), vehY = M(0xd7aa2c, 0.60, 0.05),
+        vehB = M(0x7d93a8, 0.55, 0.12), tire = M(0x272b30, 0.90, 0),
+        beltM = M(0x3a3f45, 0.90, 0), cabGlass = M(0x46586a, 0.30, 0.35);
+  const V = (x, z, ry = 0) => {
+    const grp = new THREE.Group();
+    grp.position.set(x, GY, z); grp.rotation.y = ry;
+    G.add(grp); return grp;
+  };
+  const vb = (p, w, h, d, mat, x, y, z, ry = 0, rz = 0) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z); m.rotation.y = ry; m.rotation.z = rz;
+    m.castShadow = true; p.add(m); return m;
+  };
+  const vw = (p, x, z, r = 0.30) => {                  // 车轮（轴沿 Z，车长沿 X）
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.24, 10), tire);
+    m.rotation.x = Math.PI / 2;
+    m.position.set(x, r, z); m.castShadow = true; p.add(m); return m;
+  };
+  // ① 行李传送带车：底盘 + 驾驶室 + 斜向长传送带（臂朝 −X，对准后货舱门）
+  {
+    const p = V(-9.5, -4.8, -0.10);
+    vb(p, 3.0, 0.5, 1.7, vehY, 0, 0.62, 0);
+    vb(p, 1.4, 1.35, 1.6, vehY, 1.05, 1.55, 0);
+    vb(p, 1.42, 0.5, 1.62, cabGlass, 1.05, 1.85, 0);   // 驾驶室窗带
+    vb(p, 4.6, 0.16, 1.0, beltM, -1.5, 1.75, 0, 0, 0.30);   // 传送带（仰 17°）
+    vb(p, 4.6, 0.10, 0.08, vehY, -1.5, 1.95, 0.5, 0, 0.30); // 带侧护栏
+    vb(p, 4.6, 0.10, 0.08, vehY, -1.5, 1.95, -0.5, 0, 0.30);
+    for (const sx of [1.05, -1.05]) for (const sz of [0.82, -0.82]) vw(p, sx, sz, 0.30);
+  }
+  // ② 行李拖车 ×2：平板 + 雨棚立柱 + 牵引杆（后货舱门一列）
+  for (const [dx, dz, ry] of [[-12.8, -5.4, 0.06], [-15.1, -5.0, -0.07]]) {
+    const p = V(dx, dz, ry);
+    vb(p, 2.0, 0.14, 1.3, vehB, 0, 0.62, 0);
+    vb(p, 2.0, 0.09, 1.3, vehW, 0, 1.78, 0);            // 雨棚顶
+    for (const sx of [0.9, -0.9]) for (const sz of [0.58, -0.58]) vb(p, 0.06, 1.1, 0.06, vehB, sx, 1.25, sz);
+    vb(p, 0.9, 0.07, 0.09, vehB, 1.42, 0.5, 0);         // 牵引杆
+    for (const sx of [0.72, -0.72]) for (const sz of [0.55, -0.55]) vw(p, sx, sz, 0.22);
+  }
+  // ⑤ 引导车（follow-me）：小面包 + 车顶标志牌，机头前方停止线外侧
+  {
+    const p = V(26.5, 2.4, 0.5);
+    vb(p, 3.2, 1.5, 1.7, vehW, 0, 1.15, 0);
+    vb(p, 3.22, 0.55, 1.72, cabGlass, 0, 1.5, 0);       // 环绕窗带
+    vb(p, 0.95, 0.28, 0.55, vehY, 0, 2.05, 0);          // 车顶引导牌
+    for (const sx of [1.1, -1.1]) for (const sz of [0.8, -0.8]) vw(p, sx, sz, 0.30);
+  }
+
+  // ── 安全锥筒（批次3：取代蓝色圆点灯，读感不再突兀）：InstancedMesh 一次 draw ──
+  const conePts = [];
+  for (let i = 0; i <= 6; i++) {                       // 沿机位安全边框一排
+    conePts.push([-20 + i * 6.2, -11.9]);
+    if (i % 2 === 0) conePts.push([-20 + i * 6.2, 11.9]);
+  }
+  conePts.push([-21.5, -12.6], [18.2, -12.6], [-21.5, 12.6], [18.2, 12.6]);  // 四角
+  conePts.push([-7.6, -3.6], [-11.8, -3.3], [5.0, -3.6], [24.2, -2.6], [24.2, 2.6], [27.6, 4.2]);
+  const coneIM = new THREE.InstancedMesh(
+    new THREE.ConeGeometry(0.17, 0.55, 8),
+    new THREE.MeshStandardMaterial({ color: 0xd96a28, roughness: 0.6 }), conePts.length);
+  const _mc = new THREE.Matrix4();
+  conePts.forEach((p2, i) => {
+    _mc.makeTranslation(p2[0], GY + 0.28, p2[1]);
+    coneIM.setMatrixAt(i, _mc);
+  });
+  coneIM.instanceMatrix.needsUpdate = true;
+  G.add(coneIM);
+
+  // ── 跑道边灯（白色，InstancedMesh 一次 draw call）：沿跑道两侧 ──
+  const pts = [];
+  const push = (x, z, c) => pts.push([x, GY + 0.12, z, c]);
+  for (let i = 0; i < 40; i++) {                       // 跑道边灯
+    const wx = RWY_START + i * 9;
+    push(wx, -22.5, 0xfff2c8); push(wx, 22.5, 0xfff2c8);
+  }
+  const lg = new THREE.SphereGeometry(0.42, 8, 6);
+  const lIM = new THREE.InstancedMesh(lg, new THREE.MeshBasicMaterial(), pts.length);
+  const _mm2 = new THREE.Matrix4(), _cc = new THREE.Color();
+  pts.forEach((p, i) => {
+    _mm2.makeTranslation(p[0], p[1], p[2]);
+    lIM.setMatrixAt(i, _mm2);
+    _cc.setHex(p[3]); lIM.setColorAt(i, _cc);
+  });
+  lIM.instanceMatrix.needsUpdate = true;
+  if (lIM.instanceColor) lIM.instanceColor.needsUpdate = true;
+  G.add(lIM);
+  return G;
+}
+
+function buildEnvironments() {
+  // —— 停泊：停机坪（标线已按机头 +X 定向）+ 跑道（在 STOP 线的另一侧）+ 机场要素 ——
+  const apronMat = new THREE.MeshStandardMaterial({
+    map: makeApronTexture(),
+    roughnessMap: makeApronRoughnessTexture(),   // 标线区发亮(0.7)、裸水泥毛(0.95)
+    roughness: 1.0, metalness: 0,
+  });
+  const apron = new THREE.Mesh(new THREE.PlaneGeometry(64, 64), apronMat);
+  apron.rotation.x = -Math.PI / 2;
+  apron.position.set(APRON_X, -3.42, 0);
+  apron.receiveShadow = true;
+  envPark.add(apron);
+
+  // 跑道：沿机身长轴（X），**起点在停止线之外**（STOP 在 x=22.6，跑道从 x=60 起）。
+  // 原来跑道摆在 z=−34 的侧后方，与停止线/机头朝向毫无关系。
+  const rwy = new THREE.Mesh(
+    new THREE.PlaneGeometry(45, 380),
+    new THREE.MeshStandardMaterial({ map: makeRunwayTexture(), roughness: 0.95, metalness: 0 }));
+  rwy.rotation.x = -Math.PI / 2;
+  rwy.rotation.z = Math.PI / 2;                 // 让跑道沿机身长轴（X）方向
+  rwy.position.set(60 + 190, -3.46, 0);         // 中心在 x=250，向远处延伸
+  envPark.add(rwy);
+
+  buildAirportStructures(envPark);
+
+  // —— 空中：云海 ——
+  // 关键取舍：**云要放在飞机下方的一片云层上，不要包在飞机四周**。
+  // 第一版把 46 片云均匀撒在 280×26×300 的盒子里，结果镜头到飞机之间的云
+  // 把整个画面糊成一片白，"在云端飞行"变成了"在雾里"。第二版加了数量反而更白。
+  // 现在：低层云海（y ≈ -46 ~ -16，全在飞机之下）+ 少量高空远云做纵深。
+  const texA = makeCloudTexture(11), texB = makeCloudTexture(29);
+  const rng = makeRng(7);
+  const cloudMat = (op) => new THREE.SpriteMaterial({
+    map: rng() > 0.5 ? texA : texB, transparent: true, depthWrite: false,
+    opacity: op, color: 0xf2f7fb,          // 略偏冷，避免死白
+  });
+  // 云海分**三层**铺：低层（成片、最亮）、中层（过渡）、高层（稀疏、更淡）。
+  // 单层同尺寸云团会露出一眼可见的重复纹理与"贴图感"，分层后层次、纵深与尺度差都自然得多。
+  const layers = [
+    { n: 30, y: [-58, -34], sc: [46, 104], rr: [30, 260], op: [0.52, 0.88], dr: [1.4, 4.0] },
+    { n: 36, y: [-40, -18], sc: [30, 74],  rr: [40, 300], op: [0.40, 0.72], dr: [2.4, 6.2] },
+    { n: 16, y: [14, 74],   sc: [80, 150], rr: [200, 360], op: [0.22, 0.48], dr: [3.2, 8.4] },
+  ];
+  for (const L of layers) {
+    for (let i = 0; i < L.n; i++) {
+      const s = new THREE.Sprite(cloudMat(L.op[0] + rng() * (L.op[1] - L.op[0])));
+      const sc = L.sc[0] + rng() * (L.sc[1] - L.sc[0]);
+      s.scale.set(sc, sc * (0.44 + rng() * 0.14), 1);
+      const ang = rng() * Math.PI * 2;
+      const rr = L.rr[0] + rng() * (L.rr[1] - L.rr[0]);
+      s.position.set(Math.cos(ang) * rr, L.y[0] + rng() * (L.y[1] - L.y[0]), Math.sin(ang) * rr);
+      s.userData.drift = L.dr[0] + rng() * (L.dr[1] - L.dr[0]);
+      envAir.add(s);
+    }
+  }
+}
+
+/** 发动机风扇：程序化生成（当前几何里没有风扇），绕 X 轴自转 */
+function buildFans() {
+  // ★ 必须用**短舱本体**（`E_L` / `E_R`）定位，不能用"整组并集"：
+  // 整组里还有吊挂（`Plane_Pylon_L`）和尾喷锥，它们的高度与短舱不同 ——
+  // 实测：整组并集中心 y=−1.68，而短舱本体中心 y=−1.90，**叶片被吊挂拉偏 0.22 m**，
+  // 看起来就是"风扇没对准涵道正中心"。改用本体后中心、半径都取自涵道本身。
+  for (const [grp, nacName] of [['ENG_L', 'E_L'], ['ENG_R', 'E_R']]) {
+    const gbox = new THREE.Box3();
+    let dirRef = null, layerRef = 0, any = false;
+    const _mf = new THREE.Matrix4();
+    for (const { b } of instList) {
+      if (b.group !== grp) continue;
+      if (!b.geom.boundingBox) b.geom.computeBoundingBox();
+      let used = false;
+      for (const it of b.items) {
+        if (it.name !== nacName) continue;          // 只要短舱本体，排除吊挂/尾喷锥
+        _mf.compose(it.pos, it.quat, it.scl);
+        gbox.union(new THREE.Box3().copy(b.geom.boundingBox).applyMatrix4(_mf));
+        used = true; any = true;
+      }
+      if (used && !dirRef) { dirRef = b.dir.clone(); layerRef = b.layer; }
+    }
+    if (!any) continue;                             // 该组没有短舱本体 → 退化处理
+    if (!dirRef) {                                  // 兜底：名字对不上时用整组并集
+      for (const { b } of instList) {
+        if (b.group !== grp) continue;
+        if (!b.geom.boundingBox) b.geom.computeBoundingBox();
+        for (const it of b.items) {
+          _mf.compose(it.pos, it.quat, it.scl);
+          gbox.union(new THREE.Box3().copy(b.geom.boundingBox).applyMatrix4(_mf));
+        }
+        if (!dirRef) { dirRef = b.dir.clone(); layerRef = b.layer; }
+      }
+    }
+    const center = gbox.getCenter(new THREE.Vector3());
+    const size = gbox.getSize(new THREE.Vector3());
+    // 风扇半径取涵道直径的 **40%**（≈0.84）—— 必须小于唇口内缘半径 0.93，
+    // 否则风扇被唇口挡住、从正面完全看不见（实测踩过，见下方 position 注释）。
+    const r = Math.min(size.y, size.z) * 0.40;
+    const fan = new THREE.Group();
+    const hubMat = new THREE.MeshStandardMaterial({ color: 0x5a636e, metalness: 0.85, roughness: 0.35 });
+    const blMat = new THREE.MeshStandardMaterial({ color: 0xc2c8d0, metalness: 0.95, roughness: 0.22 });
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.30, r * 0.30, r * 0.34, 18), hubMat);
+    hub.rotation.z = Math.PI / 2;                 // 圆柱默认沿 Y，转成沿 X（发动机轴）
+    fan.add(hub);
+    for (let i = 0; i < 16; i++) {
+      const bl = new THREE.Mesh(new THREE.BoxGeometry(r * 0.07, r * 0.86, r * 0.26), blMat);
+      const a = (i / 16) * Math.PI * 2;
+      bl.position.set(0, Math.cos(a) * r * 0.46, Math.sin(a) * r * 0.46);
+      bl.rotation.x = a;
+      bl.castShadow = true;
+      fan.add(bl);
+    }
+    // 放在**进气口平面**（+X = 机头侧；已用 tools/dump_group.mjs --all 核过：前起落架 X=+13、
+    // 尾翼 X=-17.5，机头确为 +X）。
+    // 两个教训：
+    //   ① 放进唇口内侧 0.08 → 风扇半径 0.88 **大于**进气道喉径 0.835，整圈被唇口挡住，
+    //      看起来就是"叶片丢失"（用户反馈的问题 2）。转动代码其实一直在跑。
+    //   ② 半径取涵道直径的 40%（≈0.84），**必须小于唇口内缘 0.93** 才能从正面看见。
+    fan.position.set(gbox.max.x + 0.01, center.y, center.z);
+    fan.userData.base = fan.position.clone();
+    modelRoot.add(fan);
+    FANS.push({ fan, bucket: { dir: dirRef, layer: layerRef } });
+  }
+}
+
+const GEAR_GROUPS = new Set(['GEAR_N', 'GEAR_ML', 'GEAR_MR', 'GEAR_WHEEL']);
+
+function setMode(m) {
+  MODE = m;
+  const air = m === 'air';
+  envPark.visible = !air;
+  envAir.visible = air;
+  groundGroup.visible = !air;
+  // 天色/雾/光：停泊为淡蓝天+微白霾、空中为深蓝高空。
+  // 天空背景走 **scene.background 的屏幕空间渐变**（见 makeSkyGradient 注释）：
+  // 没有球体棱面，远处与雾同色衔接，画面干净；
+  // PBR 环境反射走程序化天空 IBL（见 applySkyEnv），两种模式各自成图。
+  if (air) {
+    scene.fog = new THREE.Fog(0xc3dcec, 220, 760);       // 雾色贴近近地平线，远景过渡自然
+    scene.background = SKY_AIR;
+    applySkyEnv('air');
+    key.intensity = 2.7; hemi.intensity = 0.85;
+    hemi.color.set(0xd8ecff); hemi.groundColor.set(0x9fb6c6);
+    key.color.set(0xfff1dc);                             // 高空阳光偏暖一点
+    renderer.toneMappingExposure = 1.08;
+  } else {
+    scene.fog = new THREE.Fog(0xd8e1e9, 70, 240);
+    scene.background = SKY_PARK;
+    applySkyEnv('park');
+    key.intensity = 2.5; hemi.intensity = 0.6;
+    hemi.color.set(0xeaf3fb); hemi.groundColor.set(0xa8b2ba);
+    key.color.set(0xfff2e0);
+    renderer.toneMappingExposure = 1.0;
+  }
+  document.querySelectorAll('[data-m]').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
+  // 回到停泊：清掉飞行失稳与事故状态（否则切回来飞机还是歪的、事故卡还挂着）
+  if (!air) {
+    FLIGHT.crashed = false; FLIGHT.pitch = 0; FLIGHT.roll = 0; FLIGHT.state = 'cruise';
+    const c = $('crash'); if (c) c.classList.remove('on');
+  }
+  // 剖视不再随模式自动切换（旧版"停泊剖开、空中闭合"已移除）：
+  // 状态只由用户按钮决定，默认完整机身 —— 见 CUT_ON 处的说明。
+}
+
+function buildModeUI() {
+  // 模式切换已并入**场景按钮**（#scenes，见 setScene）：原 [data-m] 按钮已删除，
+  // 这里不能再按旧写法取元素 —— 取不到就是 null，会直接抛
+  // "Cannot read properties of null (reading 'classList')"（已踩过）。
+  buildEnvironments();
+  buildFans();
+}
+
+// ── 主循环 ─────────────────────────────────────────────────────────────────
+let last = performance.now(), acc = 0, frames = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  const now = performance.now(), dt = Math.min((now - last) / 1000, 0.1);
+  last = now;
+
+  if (autoPlay) {
+    T += autoDir * dt / SECONDS_TOTAL;          // 全程 SECONDS_TOTAL 秒（用户要求"不要太快"）
+    if (T >= 1) { T = 1; autoDir = -1; }
+    if (T <= 0) { T = 0; autoDir = 1; }
+    const pct = Math.round(T * 100);
+    $('t').value = pct; $('tv').textContent = pct; $('h_t').textContent = pct + '%';
+    syncZoomToExplode();                        // 演示模式下随进度拉远，避免高塔被裁
+  }
+
+  // ── 双模式动画（起落架收放 / 机体抬升 / 发动机转动 / 云漂移）──
+  const tgtGear = MODE === 'air' ? 1 : 0;
+  if (GEAR_T !== tgtGear) {
+    const d = tgtGear - GEAR_T;
+    GEAR_T += Math.sign(d) * Math.min(Math.abs(d), dt / 2.2);   // 约 2.2 s 收放完
+  }
+  // ★ 抬升只在**模式切换的过渡期**进行。停泊的翘头/翘尾会让 position.y 停在
+  //   −0.1 附近（绕主轮旋转的补偿量），如果这里每帧都跟 0 比较，就会每帧
+  //   syncZoomToExplode() 重设相机 —— 滚轮缩放立刻失效（用户反馈的问题 1）。
+  if (MODE === 'air') {
+    const tgtY = 6.5;
+    if (Math.abs(modelRoot.position.y - tgtY) > 1e-3) {
+      const d = tgtY - modelRoot.position.y;
+      modelRoot.position.y += Math.sign(d) * Math.min(Math.abs(d), dt * 3.4);
+      modelRoot.position.x = 0; modelRoot.position.z = 0;
+      syncZoomToExplode();        // 抬升过程中相机注视点必须同步跟随，否则飞机被顶出画面
+    }
+  }
+  // 发动机转动：**仅空中（有动力输出）才旋转**，停泊必须静止 ——
+  // 旧版停泊也给了 0.9 rad/s 的慢车转速（用户指出停泊不应转动）。
+  if (MODE === 'air') FAN_SPIN += dt * 7.5;
+  for (const f of FANS) f.fan.rotation.x = FAN_SPIN;
+  if (envAir.visible) {
+    for (const s of envAir.children) {
+      s.position.x += s.userData.drift * dt;
+      if (s.position.x > 320) s.position.x = -320;   // 云已铺到 r≈290，边界要跟着放宽
+    }
+  }
+
+  applyExplode();
+  if (lastLoad) {
+    // 停泊走"绕主轮接地点的翘头/翘尾"，空中走"配载驱动的姿态"
+    if (MODE === 'park') applyParkTip(lastLoad);
+    else { modelRoot.position.x = 0; modelRoot.position.z = 0; applyAttitude(lastLoad); }
+  }
+  updateFlight(dt);                        // 飞行工况：严重越界时姿态在上一层之上继续发散
+  if (labelGroup.visible) {
+    // troika 的 Text 是 Mesh，不会自动朝向相机，需要每帧对齐（Sprite 自带 billboard）
+    for (const o of labelGroup.children) {
+      if (!o.isSprite) o.quaternion.copy(camera.quaternion);
+    }
+    // 朝向定好之后再算避让：投影依赖实际朝向，顺序反了测出的屏幕尺寸会偏。
+    layoutLabels();
+  }
+  controls.update(dt);
+  renderer.render(scene, camera);
+
+  frames++; acc += dt;
+  if (acc >= 0.5) {
+    $('h_calls').textContent = renderer.info.render.calls;
+    $('h_tris').textContent = renderer.info.render.triangles.toLocaleString('zh-CN');
+    $('h_fps').textContent = Math.round(frames / acc);
+    frames = 0; acc = 0;
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+{"name":"local-vendor","private":true,"version":"1.0.0","dependencies":{"camera-controls":"^3.1.2","three-mesh-bvh":"^0.9.15","troika-three-text":"^0.52.5"}}

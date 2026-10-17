@@ -1,0 +1,540 @@
+{
+  "count": 40,
+  "note": "Blender 内置 Bfont 生成的 3D 挤出文字。Stage 1 起改由视图侧用 canvas 贴图绘制，本文件只提供内容与锚点。坐标同 .blend（Z-up，机头 +X，单位 m）。",
+  "labels": [
+    {
+      "name": "CARGO_TAG_1",
+      "text": "1 舱 前货舱",
+      "anchor": [
+        5.985,
+        0.0003,
+        -0.3
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.28,
+      "dynamic": false,
+      "src": "AC_ROOT",
+      "text_original": "1舱 前货舱",
+      "fix_reason": "原文字与《载重平衡手册》货舱编号口径不符，已按 1/3+4/5 更正"
+    },
+    {
+      "name": "CARGO_TAG_3",
+      "text": "3/4 舱 后货舱",
+      "anchor": [
+        -5.815,
+        0.0003,
+        -0.3
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.28,
+      "dynamic": false,
+      "src": "AC_ROOT",
+      "text_original": "3舱 后货舱",
+      "fix_reason": "原文字与《载重平衡手册》货舱编号口径不符，已按 1/3+4/5 更正"
+    },
+    {
+      "name": "CARGO_TAG_4",
+      "text": "5 舱 散货舱",
+      "anchor": [
+        -10.015,
+        0.0003,
+        -0.3
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.28,
+      "dynamic": false,
+      "src": "AC_ROOT",
+      "text_original": "4舱 散装",
+      "fix_reason": "原文字与《载重平衡手册》货舱编号口径不符，已按 1/3+4/5 更正"
+    },
+    {
+      "name": "Lab_Eng",
+      "text": "发动机",
+      "anchor": [
+        0.785,
+        -6.5,
+        -3.2
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.55,
+      "dynamic": false,
+      "src": "AIRCRAFT_ROOT"
+    },
+    {
+      "name": "Lab_Nose",
+      "text": "机头",
+      "anchor": [
+        15.785,
+        0.0,
+        3.5
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.55,
+      "dynamic": false,
+      "src": "AIRCRAFT_ROOT"
+    },
+    {
+      "name": "Lab_Tail",
+      "text": "机尾",
+      "anchor": [
+        -14.215,
+        0.0,
+        6.5
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.55,
+      "dynamic": false,
+      "src": "AIRCRAFT_ROOT"
+    },
+    {
+      "name": "Lab_Wing",
+      "text": "机翼",
+      "anchor": [
+        2.785,
+        6.0,
+        2.5
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.55,
+      "dynamic": false,
+      "src": "AIRCRAFT_ROOT"
+    },
+    {
+      "name": "T18.0",
+      "text": "18%",
+      "anchor": [
+        0.9902,
+        5.4,
+        1.0
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.22,
+      "dynamic": false,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "T20",
+      "text": "20%",
+      "anchor": [
+        0.9063,
+        5.4,
+        1.0
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.22,
+      "dynamic": false,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "T25",
+      "text": "25%",
+      "anchor": [
+        0.6966,
+        5.4,
+        1.0
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.22,
+      "dynamic": false,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "T30",
+      "text": "30%",
+      "anchor": [
+        0.487,
+        5.4,
+        1.0
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.22,
+      "dynamic": false,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "T36.0",
+      "text": "36%",
+      "anchor": [
+        0.2353,
+        5.4,
+        1.0
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.22,
+      "dynamic": false,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "T_Dat",
+      "text": "DATUM 机头 FS=0",
+      "anchor": [
+        18.985,
+        0.0,
+        5.2
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.38,
+      "dynamic": false,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "T_LE",
+      "text": "LEMAC",
+      "anchor": [
+        1.765,
+        5.0,
+        0.95
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.3,
+      "dynamic": false,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "T_MAC",
+      "text": "MAC=4.1935 m",
+      "anchor": [
+        -0.9317,
+        5.0,
+        1.45
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.28,
+      "dynamic": false,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "T_TE",
+      "text": "TEMAC",
+      "anchor": [
+        -2.8285,
+        5.0,
+        0.95
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.3,
+      "dynamic": false,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "T_YRuler",
+      "text": "横向CG y (左负右正)",
+      "anchor": [
+        -0.415,
+        0.0,
+        -2.0
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.22,
+      "dynamic": false,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "T_Zone_AFT",
+      "text": "后舱 0C 排21-31",
+      "anchor": [
+        -4.915,
+        0.0,
+        2.0
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.28,
+      "dynamic": false,
+      "src": "AC_ROOT",
+      "text_original": "后舱 排21-30",
+      "fix_reason": "原文字与《载重平衡手册》货舱编号口径不符，已按 1/3+4/5 更正"
+    },
+    {
+      "name": "T_Zone_FWD",
+      "text": "前舱 0A 排1-12",
+      "anchor": [
+        9.685,
+        0.0,
+        2.0
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.28,
+      "dynamic": false,
+      "src": "AC_ROOT",
+      "text_original": "前舱 排1-12",
+      "fix_reason": "原文字与《载重平衡手册》货舱编号口径不符，已按 1/3+4/5 更正"
+    },
+    {
+      "name": "T_Zone_MID",
+      "text": "中舱 0B 排13-20",
+      "anchor": [
+        1.285,
+        0.0,
+        2.0
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.28,
+      "dynamic": false,
+      "src": "AC_ROOT",
+      "text_original": "中舱 排13-20",
+      "fix_reason": "原文字与《载重平衡手册》货舱编号口径不符，已按 1/3+4/5 更正"
+    },
+    {
+      "name": "TY_+0.5",
+      "text": "+0.5",
+      "anchor": [
+        0.935,
+        0.5,
+        -2.2
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.18,
+      "dynamic": false,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "TY_-0.5",
+      "text": "-0.5",
+      "anchor": [
+        0.935,
+        -0.5,
+        -2.2
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.18,
+      "dynamic": false,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "TY_0",
+      "text": "0",
+      "anchor": [
+        0.935,
+        0.0,
+        -2.2
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.18,
+      "dynamic": false,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "TY_cur",
+      "text": "y=+0.01",
+      "anchor": [
+        1.085,
+        0.0,
+        -3.15
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.2,
+      "dynamic": true,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "TY_lim",
+      "text": "限 ±0.35 m",
+      "anchor": [
+        1.085,
+        0.0,
+        -3.45
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.18,
+      "dynamic": false,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "UI_CG",
+      "text": "CG FS 18.27 m",
+      "anchor": [
+        6.2,
+        -14.55,
+        2.9
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.26,
+      "dynamic": true,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "UI_DYN",
+      "text": "[姿态与配平] CG=18.27m %MAC=32.1%",
+      "anchor": [
+        0.8176,
+        0.8,
+        3.4
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.26,
+      "dynamic": true,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "UI_F1",
+      "text": "CG=ΣM/ΣW=18.267 m",
+      "anchor": [
+        6.2,
+        -14.5499,
+        -0.1154
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.2,
+      "dynamic": true,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "UI_F2",
+      "text": "%MAC=32.13%",
+      "anchor": [
+        6.2,
+        -14.5495,
+        -0.5154
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.2,
+      "dynamic": true,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "UI_F3",
+      "text": "y=Σ(W·yi)/ΣW=+0.0088 m",
+      "anchor": [
+        6.2,
+        -14.549,
+        -0.9154
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.2,
+      "dynamic": true,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "UI_M",
+      "text": "力矩 1312698 kg·m",
+      "anchor": [
+        6.2,
+        -14.55,
+        3.4
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.24,
+      "dynamic": true,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "UI_MAC",
+      "text": "%MAC 32.1%",
+      "anchor": [
+        6.2,
+        -14.55,
+        2.4
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.28,
+      "dynamic": true,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "UI_PAX",
+      "text": "旅客 135  业载 17360 kg",
+      "anchor": [
+        6.2,
+        -14.55,
+        0.4
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.22,
+      "dynamic": true,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "UI_Src",
+      "text": "ACAP · WBM · LOPA 3+3",
+      "anchor": [
+        6.2,
+        -14.55,
+        4.45
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.24,
+      "dynamic": false,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "UI_STAGE",
+      "text": "阶段 7/7 姿态与配平",
+      "anchor": [
+        8.0,
+        -14.5,
+        5.8
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.32,
+      "dynamic": true,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "UI_Title",
+      "text": "A320 配载平衡",
+      "anchor": [
+        6.2,
+        -14.55,
+        5.0
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.38,
+      "dynamic": false,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "UI_TRIM",
+      "text": "STAB TRIM 水平安定面配平",
+      "anchor": [
+        6.2,
+        -14.55,
+        0.9
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.22,
+      "dynamic": true,
+      "src": "AC_ROOT",
+      "text_original": "配平: 升降舵中立",
+      "fix_reason": "原文字与《载重平衡手册》货舱编号口径不符，已按 1/3+4/5 更正"
+    },
+    {
+      "name": "UI_W",
+      "text": "TOW 71860 kg",
+      "anchor": [
+        6.2,
+        -14.55,
+        3.9
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.28,
+      "dynamic": true,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "UI_Y",
+      "text": "横向 y=+0.01 m  横向居中",
+      "anchor": [
+        6.2,
+        -14.55,
+        1.9
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.24,
+      "dynamic": true,
+      "src": "AC_ROOT"
+    },
+    {
+      "name": "UI_ZFW",
+      "text": "ZFW 59860  油差 100 kg",
+      "anchor": [
+        6.2,
+        -14.55,
+        1.4
+      ],
+      "blender_rot_x": 90.0,
+      "size": 0.22,
+      "dynamic": true,
+      "src": "AC_ROOT"
+    }
+  ]
+}

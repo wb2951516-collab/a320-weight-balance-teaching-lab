@@ -1,0 +1,137 @@
+==============================================================================
+Stage 1 · 元数据契约注入 + GLB 导出
+==============================================================================
+源文件（只读打开）: D:\AI-coding\Project_pending_iteration\配载教学建模\output\配载平衡教学模型.blend
+已加载。对象总数: 744
+
+=== 0. 外形重建（参数化梯形翼面 + 186Y 座位）===
+   机翼 L: 根弦 5.60 尖弦 1.60 后掠 25.0° 上反 5.1° 展长 15.08
+   机翼 R: 根弦 5.60 尖弦 1.60 后掠 25.0° 上反 5.1° 展长 15.08
+   小翼 L: 位于翼尖 (-3.39, -17.05, 0.82)
+   小翼 R: 位于翼尖 (-3.39, 17.05, 0.82)
+   平尾: 根弦 3.60 尖弦 1.30 后掠 8.0° 半展 6.22
+   垂尾: 根弦 6.30 尖弦 2.20 后掠 28.0° 高度 5.60
+   区 FWD 已是 12 排（目标 12），无需补排
+   区 MID 已是 20 排（目标 20），无需补排
+   区 AFT 新增第 31 排（源排 30）
+   补排合计新增 18 个物件；各区座垫数 {'AFT': 66, 'FWD': 72, 'MID': 48}，合计 186 座
+   客舱地板: 长 22.0 → 23.6 m（向后延长 1.6）
+--- 机体精修（参数化旋成体）---
+   半径剖面：36 个站点，机身半径 1.975 m（FUS_DIA 3.95）
+   整机长 37.57 m（机头 +18.79 → 尾端 -18.79）
+   Plane_TailCone   站点 11  顶点  353  X[ -18.79, -14.26]  端盖 有/无
+   Plane_Fuselage   站点  8  顶点  256  X[ -14.26,  11.79]  端盖 无/无
+   Plane_Nose       站点 19  顶点  609  X[  11.79,  18.79]  端盖 无/有
+   Shell_Upper      站点 28  顶点  504  X[ -17.18,  17.23]  parent=AC_ROOT
+   驾驶舱风挡：黑基底×2 + 6 块分窗（前风挡/侧固定/滑动 ×2）+ 黑框带 6 + 中柱/A柱/中缝 6
+   翼面改为真翼型放样 5 件（机翼根厚弦比 0.139、尖 0.112；前缘圆钝、后缘收尖）
+   垂尾后缘与尾锥末端齐平，无需移动
+   短舱重建 8 件 + 吊挂重做 2 件（白漆短舱/吊挂、风扇罩 max r=1.00、 底部微扁 0.90、收敛尾喷+中心锥、风扇面深洞盘）
+   机身/翼面/尾翼颜色统一：近白 (0.93,0.95,0.98) rough 0.45 metal 0.05
+   翼尖 fence 重做：上 1.0 m + 下 0.55 m ×2，后掠 30°，点缀色
+   舵面刻线 20 条（副翼/襟翼×2/扰流板×4/升降舵/方向舵）+ 航行灯 3 个
+   机头/机身细节 12 件：雷达罩缝线、皮托管×2、AoA×2、VHF×3、GPS×2、排水×2
+   标识 6 件：注册号 B-XXXX1×2、titles「教学航空」×2（腰线以上）、垂尾点缀面板×2
+   APU 排气口：尾椎末端短圆筒 + 格栅盘（深灰金属/深洞盘）
+   起落架舱门：主起 4 片（|y|=3.795）+ 前起 2 片（共享几何 2 份）
+   起落架重建模：主起 2×（支柱+扭力臂+双轮，|y|=3.795）、前起 1×（双轮），轮底统一 -3.40 m（地面）
+   门/窗/腰线改为贴面曲板：门 8 框 6 窗 48 腰线 2（共享几何 7 份）； 门轮廓 3 份、门观察窗 2 份
+   翼内燃油箱嵌入翼盒 2 件（弦向 28%~68%、厚度占翼型 42%）
+   贴面复核：最大外飘 0.038 m（CockpitGlass_PillarC_L）OK
+
+=== 0b. 朝向断言（负值 = 后掠/后倾，正确）===
+   Plane_Wing_L     内端前缘 x= +3.985 → 外端 x= -3.045   Δx=-7.030  后掠角 +25.0°  PASS
+   Plane_Wing_R     内端前缘 x= +3.985 → 外端 x= -3.045   Δx=-7.030  后掠角 +25.0°  PASS
+   Plane_HS_L       内侧前缘 x=-13.215 → 外侧 x=-13.921   Δx=-0.706  后掠角  +8.0°  PASS
+   Plane_HS_R       内侧前缘 x=-13.215 → 外侧 x=-13.921   Δx=-0.706  后掠角  +8.0°  PASS
+   Plane_VStab      前缘 顶部x=-15.463 底部x=-12.485  Δx=-2.978  后倾 PASS
+   朝向断言结果: 全部 PASS
+
+--- 分类统计 ---
+   <CAMERA>   1
+   <EMPTY>    3
+   <LIGHT>    3
+   FONT       40
+   MESH       794
+
+--- 拆解组分布 ---
+   PAX_0A           216
+   PAX_0C           198
+   PAX_0B           144
+   WINDOWS          74
+   ANNO_TEXT        40
+   MARKINGS         28
+   DOORS            20
+   ANNO_SCALE       12
+   WING_L           12
+   WING_R           12
+   BAG_1            8
+   BAG_3            8
+   GEAR_WHEEL       6
+   ENG_L            5
+   ENG_R            5
+   GEAR_ML          5
+   GEAR_MR          5
+   GEAR_N           5
+   TAIL_VS          5
+   CARGO_1          4
+   CARGO_3          4
+   CARGO_5          4
+   HULL_UPPER       4
+   ANNO_CG          2
+   TAIL_HS          2
+   BELLY_FAIRING    1
+   FLOOR_CABIN      1
+   FLOOR_CARGO      1
+   FUEL_CTR         1
+   FUEL_WING_L      1
+   FUEL_WING_R      1
+组数: 31
+
+★ 本轮补齐 zone/row 的座椅件（原先缺失）: 360
+未映射对象数: 0
+lb_dir 非单位向量数（0 向量除外）: 0
+
+已写出标注清单（40 条）: D:\AI-coding\Project_pending_iteration\配载教学建模\output\stage1\labels.json
+已保存中间产物（含全部契约字段）: D:\AI-coding\Project_pending_iteration\配载教学建模\output\stage1\配载平衡教学模型.stage1.blend
+→ 原文件 配载平衡教学模型.blend 全程只读，未修改。
+
+已从导出场景中移除文字物体 40 个（几何改由 labels.json + 视图侧贴图承担）
+剩余待导出网格: 794
+
+--- 导出 ---
+未压缩版: OK  5.32 MB
+Draco 版: OK  1.64 MB
+
+=== GLB 校验 · 未压缩 ===
+体积: 5.32 MB | nodes 797 | meshes 720 | primitives 720 | materials 36
+extensionsUsed: ['KHR_materials_emissive_strength']
+extensionsRequired: []
+
+断言1 · 渲染节点属性覆盖: group 794/794 | layer 794/794 | dir 794/794 | anchor 794/794
+         → PASS
+断言3 · 拆解组数（非标注/环境）: 28 PASS
+         组清单: ANNO_CG, ANNO_SCALE, BAG_1, BAG_3, BELLY_FAIRING, CARGO_1, CARGO_3, CARGO_5, DOORS, ENG_L, ENG_R, FLOOR_CABIN, FLOOR_CARGO, FUEL_CTR, FUEL_WING_L, FUEL_WING_R, GEAR_ML, GEAR_MR, GEAR_N, GEAR_WHEEL, HULL_UPPER, MARKINGS, PAX_0A, PAX_0B, PAX_0C, TAIL_HS, TAIL_VS, WINDOWS, WING_L, WING_R
+断言6 · lb_dir 单位向量: PASS（异常 0）
+断言2 · GLB 内文字几何顶点: 0 PASS
+断言5 · 几何复用: 网格 794 / 唯一几何 128，平均复用 6.20× PASS
+断言4 · 体积 ≤3MB: FAIL（5.32 MB）
+
+=== GLB 校验 · Draco ===
+体积: 1.64 MB | nodes 797 | meshes 720 | primitives 720 | materials 36
+extensionsUsed: ['KHR_draco_mesh_compression', 'KHR_materials_emissive_strength']
+extensionsRequired: ['KHR_draco_mesh_compression']
+
+断言1 · 渲染节点属性覆盖: group 794/794 | layer 794/794 | dir 794/794 | anchor 794/794
+         → PASS
+断言3 · 拆解组数（非标注/环境）: 28 PASS
+         组清单: ANNO_CG, ANNO_SCALE, BAG_1, BAG_3, BELLY_FAIRING, CARGO_1, CARGO_3, CARGO_5, DOORS, ENG_L, ENG_R, FLOOR_CABIN, FLOOR_CARGO, FUEL_CTR, FUEL_WING_L, FUEL_WING_R, GEAR_ML, GEAR_MR, GEAR_N, GEAR_WHEEL, HULL_UPPER, MARKINGS, PAX_0A, PAX_0B, PAX_0C, TAIL_HS, TAIL_VS, WINDOWS, WING_L, WING_R
+断言6 · lb_dir 单位向量: PASS（异常 0）
+断言2 · GLB 内文字几何顶点: 0 PASS
+断言5 · 几何复用: 网格 794 / 唯一几何 128，平均复用 6.20× PASS
+断言4 · 体积 ≤3MB: PASS（1.64 MB）
+
+=== 压缩收益 ===
+5.32 MB → 1.64 MB，压缩比 3.2x，省 3.68 MB
+
+STAGE1_DONE

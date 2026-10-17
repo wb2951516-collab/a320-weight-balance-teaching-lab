@@ -1,0 +1,31 @@
+# ── 内部工具状态（不入库）──────────────────────────────
+.mimosa/
+.v2c/
+.video_agent/
+.zcode/
+__pycache__/
+*.pyc
+
+# ── 不可再分发的参考资料 ────────────────────────────────
+# 含真实航司内部资料与厂商版权文件（Airbus ACAP、航司 LOPA、
+# 舱单/配载手册等），仅本地使用，永不入库
+配载管理参考资料/
+LOPA图/
+飞机参考图/
+脱敏规则/
+
+# ── 依赖（由 package.json + package-lock.json 还原）────
+node_modules/
+
+# ── 备份 / 中间产物 / 日志 ──────────────────────────────
+*.blend1
+*.bak
+*.bak-*
+*.log
+output/preview/
+output/stage1/preview/
+
+# ── OS ─────────────────────────────────────────────────
+Thumbs.db
+.DS_Store
+Desktop.ini

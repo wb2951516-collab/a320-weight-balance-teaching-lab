@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>配载平衡教学台 · Load Balance Console</title>
+<style>
+/* 提亮版航空教学台：浅煤灰面板 + 高对比文字，避免过暗与叠字 */
+:root{
+  --bg:#e8ebee;
+  --panel:#f7f8fa;
+  --panel-2:#ffffff;
+  --line:#c5ccd4;
+  --line-soft:#dce2e8;
+  --text:#1a2330;
+  --text-dim:#4a5568;
+  --text-faint:#6b7788;
+  --steel:#2f6f9f;
+  --steel-bright:#1a5580;
+  --green:#1f8a4c;
+  --green-bg:#e6f5ec;
+  --amber:#b07800;
+  --amber-bg:#fff6e0;
+  --red:#c0392b;
+  --red-bg:#fdeceb;
+  --font:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:"Cascadia Code","Consolas","Courier New",monospace;
+  /* 舱段色 — 亮底上仍饱和 */
+  --c-paxF:#e07a2f;
+  --c-paxM:#2f7eb8;
+  --c-paxA:#c44d82;
+  --c-cF:#c9a012;
+  --c-cA:#d4782a;
+  --c-cB:#8b6b3e;
+  --c-fL:#278f5c;
+  --c-fR:#1e7a4a;
+  --c-fC:#3a7fad;
+  --c-oew:#7a8694;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--text);
+  font-size:14px;
+  line-height:1.5;
+}
+/* 顶栏 */
+.top{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+  padding:12px 20px;
+  background:var(--panel-2);
+  border-bottom:2px solid var(--line);
+}
+.top-l{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.brand{
+  font-family:var(--mono);font-size:11px;letter-spacing:.16em;
+  color:var(--steel);text-transform:uppercase;
+}
+.top h1{font-size:20px;font-weight:700;color:var(--text);letter-spacing:.02em}
+.top-r{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.top-r .ref{
+  font-family:var(--mono);font-size:12px;color:var(--text-dim);
+  background:var(--bg);border:1px solid var(--line);padding:4px 10px;
+}
+.dot-stat{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:6px 12px;border:1px solid var(--green);
+  background:var(--green-bg);
+  font-family:var(--mono);font-size:12px;font-weight:600;color:var(--green);
+}
+.dot-stat.bad{
+  border-color:var(--red);background:var(--red-bg);color:var(--red);
+}
+.dot-stat i{width:8px;height:8px;border-radius:50%;background:currentColor}
+
+/* 布局 */
+.shell{
+  display:grid;grid-template-columns:300px 1fr;
+  min-height:calc(100vh - 58px);
+}
+.rail{
+  border-right:1px solid var(--line);
+  background:var(--panel);
+  padding:14px 12px;
+  display:flex;flex-direction:column;gap:12px;
+  overflow:auto;
+}
+.stage{padding:14px 16px 28px;overflow:auto}
+
+.box{border:1px solid var(--line);background:var(--panel-2)}
+.box-h{
+  padding:8px 12px;border-bottom:1px solid var(--line-soft);
+  background:var(--bg);
+  display:flex;justify-content:space-between;align-items:center;gap:8px;
+}
+.box-h .en{
+  font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+  color:var(--steel);text-transform:uppercase;
+}
+.box-h .zh{font-size:12px;color:var(--text-dim);font-weight:600}
+.box-b{padding:12px}
+
+/* 预设按钮 — 双行，避免中英挤在一行 */
+.presets{display:flex;flex-direction:column;gap:8px}
+.pbtn{
+  width:100%;text-align:left;
+  padding:10px 12px;
+  border:1.5px solid var(--line);
+  background:var(--panel-2);
+  color:var(--text);
+  cursor:pointer;
+  transition:background .12s,border-color .12s;
+}
+.pbtn:hover{background:var(--bg);border-color:var(--steel)}
+.pbtn.on{border-color:var(--steel-bright);background:#eaf2f9}
+.pbtn .zh{font-size:14px;font-weight:700;display:block}
+.pbtn .en{
+  font-family:var(--mono);font-size:10px;color:var(--text-faint);
+  display:block;margin-top:2px;letter-spacing:.04em;
+}
+.pbtn.ok .zh{color:var(--green)}
+.pbtn.warn .zh{color:var(--amber)}
+.pbtn.danger .zh{color:var(--red)}
+
+/* 细调 */
+details.tune{border:1px solid var(--line);background:var(--panel-2)}
+details.tune summary{
+  cursor:pointer;padding:10px 12px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;
+  color:var(--steel);background:var(--bg);list-style:none;
+}
+details.tune summary::-webkit-details-marker{display:none}
+.tune-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.trow{display:grid;grid-template-columns:70px 1fr 52px;gap:8px;align-items:center}
+.trow label{font-size:12px;color:var(--text-dim)}
+.trow .v{
+  font-family:var(--mono);font-size:12px;text-align:right;
+  color:var(--steel-bright);font-weight:600;
+  font-variant-numeric:tabular-nums;
+}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;
+  height:6px;background:var(--line-soft);outline:none;border-radius:2px;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:14px;height:18px;background:var(--steel);
+  border:2px solid var(--panel-2);cursor:pointer;border-radius:2px;
+}
+
+/* 爆炸 */
+.expl{display:flex;gap:8px}
+.expl button{
+  flex:1;padding:10px;border:1.5px solid var(--line);
+  background:var(--panel-2);color:var(--text-dim);
+  font-family:var(--mono);font-size:12px;cursor:pointer;
+}
+.expl button.on{border-color:var(--steel-bright);background:#eaf2f9;color:var(--steel-bright);font-weight:700}
+
+/* 公式 */
+.fx{font-family:var(--mono);font-size:12px;color:var(--text-dim);line-height:2}
+.fx .row{display:flex;gap:8px;align-items:baseline}
+.fx .tag{
+  min-width:28px;font-weight:700;color:var(--steel);
+  background:#eaf2f9;padding:0 4px;text-align:center;font-size:11px;
+}
+.fx .eq{color:var(--text);font-weight:600}
+
+/* 页签 */
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tab{
+  padding:10px 16px;border:1.5px solid var(--line);
+  background:var(--panel-2);color:var(--text-dim);
+  font-size:14px;cursor:pointer;
+}
+.tab:hover{border-color:var(--steel);color:var(--text)}
+.tab.on{
+  background:var(--steel-bright);border-color:var(--steel-bright);
+  color:#fff;font-weight:700;
+}
+.pane{display:none}
+.pane.on{display:block}
+
+/* KPI — 中文在上、数字在下，避免挤在同一行 */
+.kpis{
+  display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:10px;
+}
+@media(max-width:1280px){.kpis{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:720px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{
+  background:var(--panel-2);
+  border:1px solid var(--line);
+  border-top:3px solid var(--steel);
+  padding:10px 12px;
+  min-height:78px;
+}
+.kpi .k{
+  font-size:12px;color:var(--text-dim);font-weight:600;
+  margin-bottom:4px;
+  line-height:1.3;
+}
+.kpi .k .en{
+  display:block;font-family:var(--mono);font-size:9px;
+  color:var(--text-faint);letter-spacing:.06em;margin-top:1px;
+}
+.kpi .v{
+  font-family:var(--mono);font-size:22px;font-weight:700;
+  color:var(--text);
+  font-variant-numeric:tabular-nums;
+  letter-spacing:-.02em;
+  line-height:1.2;
+  word-break:break-all;
+}
+.kpi .u{font-size:12px;font-weight:600;color:var(--text-faint);margin-left:2px}
+.kpi .n{
+  font-family:var(--mono);font-size:11px;color:var(--text-dim);
+  margin-top:4px;line-height:1.3;
+}
+.kpi.ok{border-top-color:var(--green)}
+.kpi.ok .v{color:var(--green)}
+.kpi.ok .n{color:var(--green)}
+.kpi.bad{border-top-color:var(--red);background:var(--red-bg)}
+.kpi.bad .v{color:var(--red)}
+.kpi.bad .n{color:var(--red)}
+.kpi.warn{border-top-color:var(--amber)}
+.kpi.warn .v{color:var(--amber)}
+.kpi.warn .n{color:var(--amber)}
+
+/* 状态条 */
+.stat{
+  display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;
+  padding:12px 14px;margin-bottom:12px;
+  border:1.5px solid var(--line);
+  background:var(--panel-2);
+}
+.stat .flag{
+  flex-shrink:0;
+  padding:4px 10px;
+  font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;
+  border:1.5px solid var(--steel);color:var(--steel);background:#eaf2f9;
+  white-space:nowrap;
+}
+.stat.ok{border-color:var(--green);background:var(--green-bg)}
+.stat.ok .flag{border-color:var(--green);color:var(--green);background:#fff}
+.stat.bad{border-color:var(--red);background:var(--red-bg)}
+.stat.bad .flag{border-color:var(--red);color:var(--red);background:#fff}
+.stat .msg{font-size:14px;color:var(--text);font-weight:600;line-height:1.45;flex:1;min-width:200px}
+
+/* 主画布板 */
+.board{
+  border:1.5px solid var(--line);
+  background:#f0f3f6;
+  position:relative;
+}
+.board-hdr{
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;
+  padding:8px 12px;
+  border-bottom:1px solid var(--line-soft);
+  background:var(--panel-2);
+}
+.board-hdr .en{
+  font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+  color:var(--steel);text-transform:uppercase;
+}
+.board-hdr .zh{font-size:13px;font-weight:700;color:var(--text)}
+.board-hdr .info{
+  font-family:var(--mono);font-size:12px;color:var(--text-dim);
+  font-variant-numeric:tabular-nums;
+}
+.board canvas{display:block;width:100%;height:auto;background:#f0f3f6}
+
+/* %MAC 大条 */
+.macbar{
+  margin-top:10px;border:1.5px solid var(--line);background:var(--panel-2);
+}
+.macbar-h{
+  display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px;
+  padding:10px 14px 6px;
+  border-bottom:1px solid var(--line-soft);
+}
+.macbar-h .t{max-width:70%}
+.macbar-h .t .en{
+  font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+  color:var(--steel);display:block;
+}
+.macbar-h .t .zh{font-size:13px;color:var(--text-dim);font-weight:600;display:block;margin-top:2px}
+.macbar-h .s{
+  font-family:var(--mono);font-size:28px;font-weight:700;
+  color:var(--text);font-variant-numeric:tabular-nums;
+  line-height:1;
+}
+.macbar-h .s.ok{color:var(--green)}
+.macbar-h .s.bad{color:var(--red)}
+
+.mac-body{padding:28px 18px 12px;position:relative}
+.mac-track{
+  position:relative;height:40px;
+  background:#e4e9ee;border:1.5px solid var(--line);
+}
+.mac-fill{
+  position:absolute;inset:0;
+  background:linear-gradient(90deg,
+    #f5d0c8 0%, #f5e0b8 14%,
+    #c8e6d4 20%, #c8e6d4 34%,
+    #f5e0b8 40%, #f5d0c8 55%);
+}
+.mac-safe{
+  position:absolute;top:0;bottom:0;
+  background:rgba(31,138,76,.15);
+  border-left:2px solid var(--green);
+  border-right:2px solid var(--green);
+}
+.mac-needle{
+  position:absolute;top:-10px;bottom:-10px;width:4px;
+  background:var(--steel-bright);
+  border:1px solid #fff;
+  z-index:3;
+  transition:left .2s ease-out;
+}
+.mac-needle.ok{background:var(--green)}
+.mac-needle.bad{background:var(--red)}
+.mac-needle .lab{
+  position:absolute;top:-28px;left:50%;transform:translateX(-50%);
+  font-family:var(--mono);font-size:14px;font-weight:700;
+  background:#fff;border:1.5px solid var(--line);
+  padding:2px 8px;white-space:nowrap;color:var(--text);
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+}
+.mac-trail{
+  position:absolute;top:50%;height:3px;margin-top:-1.5px;
+  background:rgba(47,111,159,.45);z-index:1;
+}
+.mac-marks{
+  display:grid;grid-template-columns:repeat(6,1fr);
+  margin-top:28px;font-family:var(--mono);font-size:11px;color:var(--text-faint);
+  text-align:center;
+}
+.mac-marks span.hl{color:var(--steel-bright);font-weight:700}
+
+/* 图例 — 多列，避免挤成一行糊在一起 */
+.leg{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+  gap:6px 10px;margin-top:10px;
+  padding:10px 12px;border:1px solid var(--line);background:var(--panel-2);
+}
+.leg span{font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:6px}
+.leg i{width:14px;height:10px;flex-shrink:0;border:1px solid rgba(0,0,0,.2)}
+
+/* 数据表 */
+.table-wrap{overflow:auto;max-height:520px;border:1px solid var(--line);background:var(--panel-2)}
+table.dt{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px}
+table.dt th{
+  position:sticky;top:0;z-index:1;
+  text-align:right;padding:10px 12px;
+  background:#e8ebee;color:var(--text-dim);
+  border-bottom:2px solid var(--line);
+  font-weight:700;font-size:11px;letter-spacing:.06em;
+  white-space:nowrap;
+}
+table.dt td{
+  text-align:right;padding:9px 12px;
+  border-bottom:1px solid var(--line-soft);
+  color:var(--text);font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+table.dt th:first-child,table.dt td:first-child{text-align:left}
+table.dt tbody tr:hover td{background:#eaf2f9}
+table.dt td .sw{display:inline-block;width:14px;height:10px;margin-right:8px;vertical-align:middle;border:1px solid rgba(0,0,0,.25)}
+table.dt .mac-ok{color:var(--green);font-weight:700}
+table.dt .mac-bad{color:var(--red);font-weight:700}
+
+/* 横滚 / 静平衡 */
+.roll-wrap,.static-grid{margin-top:0}
+.roll-wrap .board-hdr{border-bottom:1px solid var(--line-soft)}
+.roll-wrap canvas{display:block;width:100%;height:auto;background:#f0f3f6}
+.roll-note{
+  padding:12px 14px;border-top:1px solid var(--line-soft);
+  background:var(--panel-2);
+  font-family:var(--mono);font-size:13px;color:var(--text-dim);
+  line-height:1.6;
+}
+.static-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:960px){
+  .shell{grid-template-columns:1fr}
+  .rail{border-right:none;border-bottom:1px solid var(--line)}
+  .static-grid{grid-template-columns:1fr}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+}
+.fx-long{font-size:13px;color:var(--text-dim);line-height:1.9;font-family:var(--font)}
+.fx-long b{color:var(--steel-bright);font-weight:700}
+.fx-long .h{display:block;margin-top:6px;padding:8px 10px;background:var(--bg);border-left:3px solid var(--steel)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-l">
+    <div class="brand">LOAD BALANCE / TRAINING</div>
+    <h1>配载平衡教学台</h1>
+  </div>
+  <div class="top-r">
+    <span class="dot-stat" id="statDot"><i></i><span id="statTxt">包线正常</span></span>
+    <span class="ref">A320 量级教学 · 非正式性能数据</span>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="rail">
+    <div class="box">
+      <div class="box-h">
+        <span class="en">Load Preset</span>
+        <span class="zh">装载预设</span>
+      </div>
+      <div class="box-b presets" id="presets">
+        <button class="pbtn ok on" data-p="ok">
+          <span class="zh">正常配载</span>
+          <span class="en">NOMINAL · 在包线内</span>
+        </button>
+        <button class="pbtn warn" data-p="fwd">
+          <span class="zh">前重 → 低头趋势</span>
+          <span class="en">FWD HEAVY · PITCH DOWN</span>
+        </button>
+        <button class="pbtn warn" data-p="aft">
+          <span class="zh">后重 → 抬头趋势</span>
+          <span class="en">AFT HEAVY · PITCH UP</span>
+        </button>
+        <button class="pbtn danger" data-p="left">
+          <span class="zh">左重 → 右倾趋势</span>
+          <span class="en">LEFT HEAVY · ROLL RIGHT</span>
+        </button>
+        <button class="pbtn danger" data-p="right">
+          <span class="zh">右重 → 左倾趋势</span>
+          <span class="en">RIGHT HEAVY · ROLL LEFT</span>
+        </button>
+        <button class="pbtn" data-p="empty">
+          <span class="zh">空机 · 仅 OEW</span>
+          <span class="en">OEW ONLY</span>
+        </button>
+      </div>
+    </div>
+
+    <details class="tune">
+      <summary>FINE TUNE · 细调装载</summary>
+      <div class="tune-body" id="tune"></div>
+    </details>
+
+    <div class="box">
+      <div class="box-h">
+        <span class="en">Explode</span>
+        <span class="zh">爆炸拆解</span>
+      </div>
+      <div class="box-b">
+        <div class="expl">
+          <button id="ex0" class="on">组装 Assemble</button>
+          <button id="ex1">拆解 Explode</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="box-h">
+        <span class="en">Equations</span>
+        <span class="zh">核心公式</span>
+      </div>
+      <div class="box-b fx">
+        <div class="row"><span class="tag">静</span><span class="eq">升力 L ≈ 重量 W</span></div>
+        <div class="row"><span class="tag">纵</span><span class="eq">力矩 M = W × Arm</span></div>
+        <div class="row"><span class="tag">纵</span><span class="eq">CGx = Σ(W×Arm) / ΣW</span></div>
+        <div class="row"><span class="tag">纵</span><span class="eq">%MAC = (CGx − LEMAC) / MAC × 100</span></div>
+        <div class="row"><span class="tag">横</span><span class="eq">CGy = Σ(W×y) / ΣW</span></div>
+        <div class="row"><span class="tag">限</span><span class="eq">教学包线 18~36% MAC</span></div>
+        <div style="margin-top:6px;color:var(--text-faint);font-family:var(--font);font-size:12px;line-height:1.5">
+          已校验：空机 OEW@25%；前重≈6.8%、后重≈59.5% 会出包线。Arm=FS 站位（机头为 0）。
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="stage">
+    <div class="tabs">
+      <button class="tab on" data-tab="pitch">俯仰 / 纵向</button>
+      <button class="tab" data-tab="roll">横滚 / 横向</button>
+      <button class="tab" data-tab="static">静平衡 / 重量</button>
+      <button class="tab" data-tab="data">数据明细</button>
+    </div>
+
+    <!-- 俯仰 -->
+    <section class="pane on" id="pane-pitch">
+      <div class="kpis">
+        <div class="kpi" id="kTow">
+          <div class="k">起飞重量<span class="en">TOW</span></div>
+          <div class="v">—</div>
+        </div>
+        <div class="kpi" id="kMom">
+          <div class="k">纵向总力矩<span class="en">ΣMOMENT</span></div>
+          <div class="v">—</div>
+        </div>
+        <div class="kpi" id="kCg">
+          <div class="k">纵向重心站位<span class="en">CG STATION</span></div>
+          <div class="v">—</div>
+        </div>
+        <div class="kpi" id="kMac">
+          <div class="k">俯仰 %MAC<span class="en">LONGITUDINAL CG</span></div>
+          <div class="v">—</div>
+          <div class="n" id="kMacN"></div>
+        </div>
+        <div class="kpi" id="kZfw">
+          <div class="k">零油重<span class="en">ZFW</span></div>
+          <div class="v">—</div>
+        </div>
+        <div class="kpi" id="kPay">
+          <div class="k">业载<span class="en">PAYLOAD</span></div>
+          <div class="v">—</div>
+        </div>
+      </div>
+
+      <div class="stat ok" id="stPitch">
+        <span class="flag" id="stFlag">NOMINAL</span>
+        <span class="msg" id="stPitchTxt">—</span>
+      </div>
+
+      <div class="board">
+        <div class="board-hdr">
+          <div>
+            <div class="en">Longitudinal Cutaway</div>
+            <div class="zh">侧剖舱段示意 · 色条高度随重量变化</div>
+          </div>
+          <div class="info" id="boardMc">—</div>
+        </div>
+        <canvas id="view" width="1400" height="600"></canvas>
+      </div>
+
+      <div class="macbar">
+        <div class="macbar-h">
+          <div class="t">
+            <span class="en">Longitudinal CG Envelope</span>
+            <span class="zh">%MAC 教学包线 18% ~ 36%</span>
+          </div>
+          <div class="s" id="macBig">—</div>
+        </div>
+        <div class="mac-body">
+          <div class="mac-track" id="macTrack">
+            <div class="mac-fill"></div>
+            <div class="mac-safe" id="macSafe"></div>
+            <div class="mac-trail" id="macTrail" style="display:none"></div>
+            <div class="mac-needle" id="macNeedle"><span class="lab" id="macLab">CG</span></div>
+          </div>
+          <div class="mac-marks">
+            <span>0%<br>LEMAC</span>
+            <span>10%</span>
+            <span class="hl">18%<br>前限</span>
+            <span class="hl">36%<br>后限</span>
+            <span>50%</span>
+            <span>60%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="leg" id="legPitch"></div>
+    </section>
+
+    <!-- 横滚 -->
+    <section class="pane" id="pane-roll">
+      <div class="kpis">
+        <div class="kpi" id="kY">
+          <div class="k">横向重心 y<span class="en">CG Y</span></div>
+          <div class="v">—</div>
+        </div>
+        <div class="kpi" id="kImb">
+          <div class="k">左右载荷差<span class="en">LOAD DIFF</span></div>
+          <div class="v">—</div>
+        </div>
+        <div class="kpi" id="kFuelImb">
+          <div class="k">左右油差<span class="en">FUEL IMBALANCE</span></div>
+          <div class="v">—</div>
+        </div>
+        <div class="kpi" id="kRollM">
+          <div class="k">滚转力矩相对<span class="en">ROLL MOMENT</span></div>
+          <div class="v">—</div>
+        </div>
+        <div class="kpi" id="kAil">
+          <div class="k">副翼配平<span class="en">AILERON TRIM</span></div>
+          <div class="v">—</div>
+        </div>
+        <div class="kpi" id="kYok">
+          <div class="k">横向判定<span class="en">LATERAL</span></div>
+          <div class="v">—</div>
+        </div>
+      </div>
+      <div class="stat ok" id="stRoll">
+        <span class="flag" id="stRollFlag">ROLL OK</span>
+        <span class="msg" id="stRollTxt">—</span>
+      </div>
+      <div class="box roll-wrap">
+        <div class="board-hdr">
+          <div>
+            <div class="en">Front View · Roll Attitude</div>
+            <div class="zh">前视横滚示意 · 横向重心与油差</div>
+          </div>
+        </div>
+        <canvas id="attitude" width="1400" height="440"></canvas>
+        <div class="roll-note" id="rollNote">—</div>
+      </div>
+    </section>
+
+    <!-- 静平衡 -->
+    <section class="pane" id="pane-static">
+      <div class="kpis">
+        <div class="kpi" id="sW">
+          <div class="k">总重<span class="en">WEIGHT</span></div>
+          <div class="v">—</div>
+        </div>
+        <div class="kpi" id="sL">
+          <div class="k">平飞升力≈W<span class="en">LIFT</span></div>
+          <div class="v">—</div>
+        </div>
+        <div class="kpi" id="sFuel">
+          <div class="k">燃油<span class="en">FUEL</span></div>
+          <div class="v">—</div>
+        </div>
+        <div class="kpi" id="sPay">
+          <div class="k">业载<span class="en">PAYLOAD</span></div>
+          <div class="v">—</div>
+        </div>
+        <div class="kpi" id="sPax">
+          <div class="k">旅客人数<span class="en">PAX</span></div>
+          <div class="v">—</div>
+        </div>
+        <div class="kpi" id="sMax">
+          <div class="k">距 MTOW 余量<span class="en">MARGIN</span></div>
+          <div class="v">—</div>
+        </div>
+      </div>
+      <div class="stat ok" id="stStatic">
+        <span class="flag" id="stSFlag">W&amp;B</span>
+        <span class="msg" id="stStaticTxt">—</span>
+      </div>
+      <div class="static-grid">
+        <div class="box">
+          <div class="box-h">
+            <span class="en">Weight Stack</span>
+            <span class="zh">重量构成</span>
+          </div>
+          <div class="box-b">
+            <canvas id="wstack" width="700" height="320"></canvas>
+          </div>
+        </div>
+        <div class="box">
+          <div class="box-h">
+            <span class="en">Three-Axis Relation</span>
+            <span class="zh">三轴平衡关系</span>
+          </div>
+          <div class="box-b fx-long">
+            <span class="h"><b>静平衡</b> — 定「有多重」：OEW + 旅客 + 行李 + 货 + 油；平飞 L≈W；超 MTOW 必须减载或减油。</span>
+            <span class="h"><b>俯仰平衡</b> — 定「重心前后」：%MAC 落在前/后限之间；前重低头、后重抬头，影响配平与安定性。</span>
+            <span class="h"><b>横滚平衡</b> — 定「重心左右」：CGy 与左右油差在限内；偏左易右倾，偏右易左倾。</span>
+            <span class="h"><b>上下游</b>：值机分舱 → 行李货舱 → 加油 → 计算 TOW / CG → 装载单 / 舱单 → 放行装机。</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 数据 -->
+    <section class="pane" id="pane-data">
+      <div class="box">
+        <div class="box-h">
+          <span class="en">Load Manifest</span>
+          <span class="zh">配载细项 · 重量 × 力臂 = 力矩</span>
+        </div>
+        <div class="box-b" style="padding:0">
+          <div class="table-wrap">
+            <table class="dt" id="tbl">
+              <thead>
+                <tr>
+                  <th>项目</th>
+                  <th>重量 kg</th>
+                  <th>纵臂 m</th>
+                  <th>纵力矩</th>
+                  <th>%MAC</th>
+                  <th>横向 y</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ===== 教学参数：与 scripts/a320_data.py 一致 =====
+   公式：M=W×Arm；CG=Σ(W×Arm)/ΣW；%MAC=(CG-LEMAC)/MAC×100
+   Arm = DATUM(机头 FS0) 向后的计算站位
+*/
+const MAC=4.1935, LEMAC=16.92, NOSE_X=18.785;
+const OEW=42500, OEW_ST=LEMAC+(25/100)*MAC; /* 17.9684 → 25% MAC */
+const PAX_W=84, BAG_W=12, MAX_TOW=78000;
+const SAFE=[18,36], Y_LIM=0.35, FUEL_IMB_LIM=800, MAC_SCALE_MAX=60;
+
+const ZONES={
+  FWD:{label:"前舱旅客",st:11.20,max:60,color:"#e07a2f"},
+  MID:{label:"中舱旅客",st:18.50,max:70,color:"#2f7eb8"},
+  AFT:{label:"后舱旅客",st:25.80,max:50,color:"#c44d82"},
+};
+const CARGO={
+  FWD:{label:"前货舱",st:12.80,max:3175,color:"#c9a012"},
+  AFT:{label:"后货舱",st:24.60,max:4480,color:"#d4782a"},
+  BULK:{label:"散装舱",st:28.80,max:1495,color:"#8b6b3e"},
+};
+const FUEL={
+  WING_L:{label:"左翼油",st:18.20,max:7500,color:"#278f5c",y:-5.5},
+  WING_R:{label:"右翼油",st:18.20,max:7500,color:"#1e7a4a",y:5.5},
+  CTR:{label:"中央油",st:18.50,max:6145,color:"#3a7fad",y:0},
+};
+
+const state={
+  pax:{FWD:40,MID:60,AFT:35},
+  cargo:{FWD:1800,AFT:2200,BULK:400},
+  fuel:{WING_L:4200,WING_R:4300,CTR:3500},
+  cargoY:{FWD:0.15,AFT:-0.10,BULK:0.05},
+  explode:0,
+  trail:[],
+};
+
+const pctMac=st=>(st-LEMAC)/MAC*100;
+const fmt=(n,d=0)=>Number(n).toLocaleString("zh-CN",{minimumFractionDigits:d,maximumFractionDigits:d});
+
+function compute(){
+  const items=[{key:"OEW",label:"OEW 使用空机",w:OEW,st:OEW_ST,y:0,color:"#7a8694"}];
+  for(const z of Object.keys(ZONES)){
+    const n=state.pax[z];
+    items.push({key:"P"+z,label:ZONES[z].label,w:n*PAX_W,st:ZONES[z].st,
+      y:z==="FWD"?0.02:z==="MID"?-0.01:0.03,color:ZONES[z].color,n});
+    const bs=z==="FWD"?CARGO.FWD:CARGO.AFT;
+    const yk=z==="FWD"?"FWD":"AFT";
+    items.push({key:"B"+z,label:"行李 "+ZONES[z].label,w:n*BAG_W,st:bs.st,y:state.cargoY[yk],color:"#a89078"});
+  }
+  for(const c of Object.keys(CARGO)){
+    items.push({key:"C"+c,label:"货物 "+CARGO[c].label,w:state.cargo[c],st:CARGO[c].st,y:state.cargoY[c],color:CARGO[c].color});
+  }
+  for(const f of Object.keys(FUEL)){
+    items.push({key:"F"+f,label:"燃油 "+FUEL[f].label,w:state.fuel[f],st:FUEL[f].st,y:FUEL[f].y,color:FUEL[f].color});
+  }
+  for(const it of items){it.m=it.w*it.st;it.mac=pctMac(it.st);it.my=it.w*it.y}
+
+  const tow=items.reduce((s,i)=>s+i.w,0);
+  const mom=items.reduce((s,i)=>s+i.m,0);
+  const my=items.reduce((s,i)=>s+i.my,0);
+  const cg=tow?mom/tow:0, cy=tow?my/tow:0;
+  const mac=pctMac(cg);
+  const fuel=state.fuel.WING_L+state.fuel.WING_R+state.fuel.CTR;
+  const fuelImb=Math.abs(state.fuel.WING_L-state.fuel.WING_R);
+  const payload=Object.values(state.pax).reduce((a,b)=>a+b,0)*(PAX_W+BAG_W)
+    +Object.values(state.cargo).reduce((a,b)=>a+b,0);
+  const okMac=mac>=SAFE[0]&&mac<=SAFE[1];
+  const okY=Math.abs(cy)<=Y_LIM;
+  const okFuel=fuelImb<=FUEL_IMB_LIM;
+  const okTow=tow<=MAX_TOW;
+  const pitch=mac<SAFE[0]?"前重 · 低头趋势":mac>SAFE[1]?"后重 · 抬头趋势":"俯仰包线内";
+  const roll=Math.abs(cy)<0.05?"横向居中":cy>0?"CG 偏右 · 易左倾":"CG 偏左 · 易右倾";
+  return {items,tow,mom,cg,cy,mac,fuel,fuelImb,payload,okMac,okY,okFuel,okTow,pitch,roll,
+    leftW:items.filter(i=>i.y<0).reduce((s,i)=>s+i.w,0),
+    rightW:items.filter(i=>i.y>0).reduce((s,i)=>s+i.w,0),
+    zfw:tow-fuel};
+}
+
+function buildTune(){
+  const el=document.getElementById("tune");
+  const add=(lab,id,val,min,max,step,fm)=>{
+    const d=document.createElement("div");d.className="trow";
+    d.innerHTML=`<label>${lab}</label><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}"><div class="v" id="${id}_v">${fm?fm(val):val}</div>`;
+    el.appendChild(d);
+  };
+  add("前舱旅客","pax_FWD",state.pax.FWD,0,60,1);
+  add("中舱旅客","pax_MID",state.pax.MID,0,70,1);
+  add("后舱旅客","pax_AFT",state.pax.AFT,0,50,1);
+  add("前货舱","cargo_FWD",state.cargo.FWD,0,3500,50);
+  add("后货舱","cargo_AFT",state.cargo.AFT,0,4500,50);
+  add("散装舱","cargo_BULK",state.cargo.BULK,0,1500,50);
+  add("左翼油","fuel_WING_L",state.fuel.WING_L,0,9000,100);
+  add("右翼油","fuel_WING_R",state.fuel.WING_R,0,9000,100);
+  add("中央油","fuel_CTR",state.fuel.CTR,0,8000,100);
+  add("前货偏置","cargoY_FWD",state.cargoY.FWD,-0.8,0.8,0.05,v=>(+v).toFixed(2));
+  add("后货偏置","cargoY_AFT",state.cargoY.AFT,-0.8,0.8,0.05,v=>(+v).toFixed(2));
+  add("散装偏置","cargoY_BULK",state.cargoY.BULK,-0.8,0.8,0.05,v=>(+v).toFixed(2));
+
+  el.querySelectorAll("input").forEach(inp=>{
+    inp.addEventListener("input",()=>{
+      const id=inp.id,v=+inp.value;
+      if(id.startsWith("pax_")) state.pax[id.slice(4)]=v;
+      else if(id.startsWith("cargoY_")) state.cargoY[id.slice(7)]=v;
+      else if(id.startsWith("cargo_")) state.cargo[id.slice(6)]=v;
+      else if(id.startsWith("fuel_")) state.fuel[id.slice(5)]=v;
+      document.getElementById(id+"_v").textContent=id.startsWith("cargoY_")?(+v).toFixed(2):v;
+      document.querySelectorAll(".pbtn").forEach(b=>b.classList.remove("on"));
+      render(true);
+    });
+  });
+}
+function setTune(){
+  const map={};
+  for(const g of ["pax","cargo","fuel"]) for(const k of Object.keys(state[g])) map[g+"_"+k]=state[g][k];
+  for(const k of Object.keys(state.cargoY)) map["cargoY_"+k]=state.cargoY[k];
+  for(const [id,v] of Object.entries(map)){
+    const el=document.getElementById(id); if(!el) continue;
+    el.value=v;
+    document.getElementById(id+"_v").textContent=id.startsWith("cargoY_")?Number(v).toFixed(2):v;
+  }
+}
+
+function kpi(id,val,cls,note){
+  const el=document.getElementById(id);
+  el.querySelector(".v").innerHTML=val;
+  el.classList.remove("ok","bad","warn");
+  if(cls) el.classList.add(cls);
+  const n=el.querySelector(".n");
+  if(n) n.textContent=note||"";
+}
+
+/* ===== 侧剖画布 ===== */
+const VIEW={w:1400,h:600};
+const MAP={st0:0,st1:37,x0:90,x1:1310};
+const sx=st=>MAP.x0+(st-MAP.st0)/(MAP.st1-MAP.st0)*(MAP.x1-MAP.x0);
+
+/* 双轨横向槽 + 翼根燃油竖条（放大版，充分利用机身/画布） */
+const LAY={
+  bodyY:100,
+  bodyH:210,
+  cabY:145,
+  cabH:44,
+  cargoY:215,
+  cargoH:36,
+  fuelBaseY:420,
+  fuelHMax:100,
+  fuelBarW:42,
+  fuelGap:36,
+  fuelCx:0,
+};
+
+/* 横向槽：长度=FS 区间；填充=重量/max 从左(前)向右 */
+const H_SLOTS=[
+  {st0:7,  st1:13, track:"cab",  color:ZONES.FWD.color,  label:"前舱",
+   w:()=>state.pax.FWD*PAX_W, cap:60*PAX_W, val:()=>`${state.pax.FWD}人`},
+  {st0:13, st1:22, track:"cab",  color:ZONES.MID.color,  label:"中舱",
+   w:()=>state.pax.MID*PAX_W, cap:70*PAX_W, val:()=>`${state.pax.MID}人`},
+  {st0:22, st1:27, track:"cab",  color:ZONES.AFT.color,  label:"后舱",
+   w:()=>state.pax.AFT*PAX_W, cap:50*PAX_W, val:()=>`${state.pax.AFT}人`},
+  {st0:10, st1:15, track:"cargo",color:CARGO.FWD.color,  label:"前货舱",
+   w:()=>state.cargo.FWD, cap:3175, val:()=>`${fmt(state.cargo.FWD)}kg`},
+  {st0:22, st1:26, track:"cargo",color:CARGO.AFT.color,  label:"后货舱",
+   w:()=>state.cargo.AFT, cap:4480, val:()=>`${fmt(state.cargo.AFT)}kg`},
+  {st0:26, st1:30, track:"cargo",color:CARGO.BULK.color, label:"散装舱",
+   w:()=>state.cargo.BULK, cap:1495, val:()=>`${fmt(state.cargo.BULK)}kg`},
+];
+
+/* 竖向油条：左｜中央｜右，间距拉开 */
+const V_FUEL=[
+  {key:"WING_L",label:"左翼油",  color:FUEL.WING_L.color, w:()=>state.fuel.WING_L, cap:7500, val:()=>`${fmt(state.fuel.WING_L)}kg`},
+  {key:"CTR",    label:"中央油箱",color:FUEL.CTR.color,    w:()=>state.fuel.CTR,    cap:6145, val:()=>`${fmt(state.fuel.CTR)}kg`},
+  {key:"WING_R", label:"右翼油",  color:FUEL.WING_R.color, w:()=>state.fuel.WING_R, cap:7500, val:()=>`${fmt(state.fuel.WING_R)}kg`},
+];
+
+function rr(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+function drawPitch(ctx,res){
+  const W=VIEW.w,H=VIEW.h;
+  ctx.clearRect(0,0,W,H);
+
+  /* 轻网格 */
+  ctx.strokeStyle="#e3e8ee"; ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+
+  const bodyY=LAY.bodyY, bodyH=LAY.bodyH, bodyMid=bodyY+bodyH/2;
+  const noseTip=sx(1.2), noseJoin=sx(4.2);
+  const tailJoin=sx(31.8), tailEnd=sx(36.3);
+  const wingLE=sx(14.2), wingTE=sx(22.2);
+  const dx=sx(0);
+  LAY.fuelCx=sx(18.2);
+
+  /* ===== 带① 顶栏：DATUM + MAC ===== */
+  ctx.strokeStyle="#b07800"; ctx.lineWidth=2;
+  ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(dx,12); ctx.lineTo(dx,H-90); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle="#b07800";
+  ctx.font="700 13px Consolas,monospace";
+  ctx.fillText("DATUM",dx+8,28);
+  ctx.font="12px Segoe UI,Microsoft YaHei,sans-serif";
+  ctx.fillText("基准面",dx+8,44);
+
+  const le=sx(LEMAC), te=sx(LEMAC+MAC), macY=36;
+  ctx.fillStyle="#2f7eb8";
+  ctx.fillRect(le,macY,Math.max(te-le,10),10);
+  ctx.fillStyle="#2f6f9f";
+  ctx.font="700 12px Consolas,monospace";
+  ctx.fillText("LEMAC",le,macY-6);
+  ctx.fillText("TEMAC",Math.max(te-52,le+48),macY-6);
+  ctx.font="12px Consolas,monospace";
+  ctx.fillText(`MAC ${MAC.toFixed(3)} m`,le+100,macY-6);
+  const s0=sx(LEMAC+MAC*SAFE[0]/100), s1=sx(LEMAC+MAC*SAFE[1]/100);
+  ctx.fillStyle="rgba(31,138,76,.22)";
+  ctx.fillRect(s0,macY-2,s1-s0,14);
+
+  /* ===== 机身 / 机翼 / 尾翼（无发动机） ===== */
+  ctx.strokeStyle="#5a7a9a"; ctx.lineWidth=3;
+  ctx.fillStyle="#dce8f2";
+  rr(ctx,noseJoin,bodyY,tailJoin-noseJoin,bodyH,16); ctx.fill(); ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(noseTip,bodyMid);
+  ctx.lineTo(noseJoin,bodyY+6);
+  ctx.lineTo(noseJoin,bodyY+bodyH-6);
+  ctx.closePath();
+  ctx.fillStyle="#c5d8ea"; ctx.fill(); ctx.stroke();
+  ctx.fillStyle="#3d5a75";
+  ctx.fillRect(noseJoin-24,bodyY+22,32,8);
+
+  ctx.beginPath();
+  ctx.moveTo(tailJoin,bodyY+8);
+  ctx.lineTo(tailEnd,bodyMid-4);
+  ctx.lineTo(tailEnd,bodyMid+4);
+  ctx.lineTo(tailJoin,bodyY+bodyH-8);
+  ctx.closePath();
+  ctx.fillStyle="#c5d8ea"; ctx.fill(); ctx.stroke();
+
+  /* 垂尾 / 平尾 */
+  ctx.beginPath();
+  ctx.moveTo(tailJoin+14,bodyY+10);
+  ctx.lineTo(tailEnd-4,bodyY-52);
+  ctx.lineTo(tailEnd+6,bodyY-52);
+  ctx.lineTo(tailEnd,bodyY+12);
+  ctx.closePath();
+  ctx.fillStyle="#7a9bb8"; ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(tailJoin+6,bodyMid-2);
+  ctx.lineTo(tailEnd+32,bodyMid-12);
+  ctx.lineTo(tailEnd+32,bodyMid-2);
+  ctx.lineTo(tailJoin+6,bodyMid+4);
+  ctx.closePath();
+  ctx.fillStyle="#8aabc6"; ctx.fill(); ctx.stroke();
+
+  /* 机翼：扁平后掠，给油竖条留出下沿空间 */
+  ctx.beginPath();
+  ctx.moveTo(wingLE,bodyY+bodyH-2);
+  ctx.lineTo(sx(19.5),bodyY+bodyH+40);
+  ctx.lineTo(wingTE+24,bodyY+bodyH+36);
+  ctx.lineTo(wingTE,bodyY+bodyH-2);
+  ctx.closePath();
+  ctx.fillStyle="#a8bfd4"; ctx.fill(); ctx.stroke();
+
+  /* 机件短名 — 带边缘，不压条 */
+  ctx.font="700 13px Segoe UI,Microsoft YaHei,sans-serif";
+  ctx.fillText("机头",noseTip+2,bodyY-16);
+  ctx.fillText("机翼",sx(14.5),bodyY+bodyH+48);
+  ctx.fillText("平尾",tailEnd-4,bodyMid-24);
+  ctx.fillText("垂尾",tailEnd-28,bodyY-60);
+  ctx.fillStyle="#6b7788";
+  ctx.fillText("机尾",tailEnd-22,bodyY+bodyH-28);
+
+  /* ===== 带② 机身上：客舱短名 ===== */
+  ctx.fillStyle="#334155";
+  ctx.font="700 14px Segoe UI,Microsoft YaHei,sans-serif";
+  ctx.fillText("客舱 PASSENGER · 机身内",sx(7),bodyY-30);
+
+  /* ===== 带③ 机身内：客舱横向填充条 ===== */
+  const ex=state.explode;
+  function drawHTrack(slot){
+    /* 关键：机头在左 → 小站位在左；槽长 = sx(st1)-sx(st0) */
+    const x=sx(slot.st0);
+    const bw=Math.max(40,sx(slot.st1)-sx(slot.st0));
+    const isCab=slot.track==="cab";
+    const by=isCab?LAY.cabY:LAY.cargoY;
+    const bh=isCab?LAY.cabH:LAY.cargoH;
+    const ratio=Math.min(1,slot.cap?slot.w()/slot.cap:0);
+    const fillW=bw*ratio;
+    const dy=(isCab?-1:1)*ex*20;
+
+    /* 槽底 — 铺满 FS 区间 */
+    ctx.fillStyle="#f3f6f9";
+    ctx.strokeStyle="#9aa8b8"; ctx.lineWidth=1.5;
+    rr(ctx,x,by,bw,bh,4); ctx.fill(); ctx.stroke();
+
+    /* 从左(前)向右按重量填充 */
+    if(fillW>0.5){
+      ctx.globalAlpha=0.95;
+      ctx.fillStyle=slot.color;
+      rr(ctx,x,by+dy,fillW,bh,4); ctx.fill();
+      ctx.globalAlpha=1;
+    }
+
+    /* 数值：优先填在色条右侧内，保证可读 */
+    ctx.font="700 13px Consolas,monospace";
+    const txt=slot.val();
+    const tw=ctx.measureText(txt).width;
+    if(fillW>tw+16){
+      ctx.fillStyle="#fff";
+      ctx.fillText(txt,x+fillW-tw-8,by+bh/2+5);
+    }else if(bw>tw+16){
+      ctx.fillStyle="#2f6f9f";
+      ctx.fillText(txt,x+fillW+8,by+bh/2+5);
+    }
+
+    /* 舱名：客舱在槽上方、货舱在槽下方，字号加大 */
+    ctx.fillStyle="#1a2330";
+    ctx.font="700 14px Segoe UI,Microsoft YaHei,sans-serif";
+    const mx=x+bw/2;
+    const tw2=ctx.measureText(slot.label).width;
+    if(isCab){
+      ctx.fillText(slot.label,mx-tw2/2,by-10);
+    }else{
+      ctx.fillText(slot.label,mx-tw2/2,by+bh+20);
+    }
+  }
+  H_SLOTS.forEach(drawHTrack);
+
+  /* 货舱分区标题 — 与货舱名错开一行 */
+  ctx.fillStyle="#334155";
+  ctx.font="700 14px Segoe UI,Microsoft YaHei,sans-serif";
+  ctx.fillText("货舱 CARGO · 腹舱",sx(10),LAY.cargoY-10);
+
+  /* ===== 带④ 翼根：燃油竖向填充条 ===== */
+  ctx.fillStyle="#334155";
+  ctx.font="700 14px Segoe UI,Microsoft YaHei,sans-serif";
+  ctx.fillText("燃油 FUEL · 翼根",LAY.fuelCx-55,bodyY+bodyH+50);
+
+  const fBase=LAY.fuelBaseY;
+  const barW=LAY.fuelBarW, gap=LAY.fuelGap;
+  const startX=LAY.fuelCx-(barW+gap/2)*1;
+  /* 三柱：左 | 中 | 右，间距拉开 */
+  V_FUEL.forEach((f,i)=>{
+    const ratio=Math.min(1,f.cap?f.w()/f.cap:0);
+    const bh=Math.max(6,LAY.fuelHMax*ratio);
+    const bx=startX+(i-1)*(barW+gap);
+    ctx.fillStyle="#f3f6f9";
+    ctx.strokeStyle="#9aa8b8"; ctx.lineWidth=1.5;
+    rr(ctx,bx,fBase-LAY.fuelHMax,barW,LAY.fuelHMax,4); ctx.fill(); ctx.stroke();
+    if(bh>3){
+      ctx.fillStyle=f.color;
+      rr(ctx,bx,fBase-bh,barW,bh,4); ctx.fill();
+    }
+    /* 数值：写在柱内或柱上 */
+    ctx.font="700 12px Consolas,monospace";
+    const v=f.val();
+    if(f.w()>0){
+      if(bh>28){
+        ctx.fillStyle="#fff";
+        const tw=ctx.measureText(v).width;
+        ctx.fillText(v,bx+(barW-tw)/2,fBase-8);
+      }else{
+        ctx.fillStyle="#1a2330";
+        const tw=ctx.measureText(v).width;
+        ctx.fillText(v,bx+(barW-tw)/2,fBase-LAY.fuelHMax-8);
+      }
+    }
+    /* 名称：柱下，左右柱略外扩，中柱下一行 */
+    ctx.fillStyle="#1a2330";
+    ctx.font="700 13px Segoe UI,Microsoft YaHei,sans-serif";
+    const tw2=ctx.measureText(f.label).width;
+    const ly=fBase+(i===1?36:18);
+    ctx.fillText(f.label,bx+(barW-tw2)/2,ly);
+  });
+
+  /* ===== CG ===== */
+  const cgx=sx(res.cg);
+  const ok=res.okMac;
+  const cgCol=ok?"#1f8a4c":"#c0392b";
+
+  if(state.trail.length>1){
+    for(let i=1;i<state.trail.length;i++){
+      const x1=sx(LEMAC+MAC*state.trail[i-1]/100);
+      const x2=sx(LEMAC+MAC*state.trail[i]/100);
+      ctx.strokeStyle=`rgba(47,111,159,${0.15+0.35*i/state.trail.length})`;
+      ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.moveTo(x1,bodyMid); ctx.lineTo(x2,bodyMid); ctx.stroke();
+    }
+  }
+
+  ctx.strokeStyle=cgCol; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(cgx,bodyY-30); ctx.lineTo(cgx,bodyY+bodyH+8); ctx.stroke();
+  ctx.fillStyle=cgCol;
+  ctx.beginPath();
+  ctx.moveTo(cgx,bodyY-30); ctx.lineTo(cgx-10,bodyY-48); ctx.lineTo(cgx+10,bodyY-48);
+  ctx.closePath(); ctx.fill();
+
+  /* CG 牌 — 右上角信息带，不压舱段 */
+  const lab2=`CG ${res.mac.toFixed(1)}%`;
+  ctx.font="700 14px Consolas,monospace";
+  const boxW=Math.max(ctx.measureText(lab2).width,90)+20;
+  const boxX=W-boxW-16, boxY=18;
+  ctx.fillStyle="#fff"; ctx.strokeStyle=cgCol; ctx.lineWidth=2;
+  rr(ctx,boxX,boxY,boxW,34,3); ctx.fill(); ctx.stroke();
+  ctx.fillStyle=cgCol;
+  ctx.fillText(lab2,boxX+10,boxY+22);
+
+  /* ===== 带⑤ 底栏：ARM + 姿态 ===== */
+  const armY=H-28;
+  ctx.strokeStyle="#b07800"; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(dx,armY); ctx.lineTo(cgx,armY); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cgx,armY); ctx.lineTo(cgx-8,armY-5); ctx.lineTo(cgx-8,armY+5);
+  ctx.closePath(); ctx.fillStyle="#b07800"; ctx.fill();
+  ctx.fillStyle="#b07800";
+  ctx.font="700 12px Segoe UI,Microsoft YaHei,sans-serif";
+  ctx.fillText("ARM 纵向力臂 DATUM→CG",dx+8,armY-8);
+
+  ctx.fillStyle=ok?"#1f8a4c":"#c0392b";
+  ctx.fillRect(0,H-22,W,22);
+  ctx.fillStyle="#fff";
+  ctx.font="700 12px Segoe UI,Microsoft YaHei,sans-serif";
+  const pitchTxt=ok
+    ? (res.mac<(SAFE[0]+SAFE[1])/2?"姿态 · 重心偏前半区（包线内）":"姿态 · 重心偏后半区（包线内）")
+    : (res.mac<SAFE[0]?"姿态 · 前重低头 · 超前限":"姿态 · 后重抬头 · 超后限");
+  ctx.fillText(pitchTxt,16,H-6);
+
+  document.getElementById("boardMc").textContent=
+    `MAC ${MAC.toFixed(3)} m · LEMAC ${LEMAC.toFixed(2)} m · CG ${res.cg.toFixed(2)} m · 站位 FS`;
+}
+
+function drawMacBar(res){
+  const safe=document.getElementById("macSafe");
+  const needle=document.getElementById("macNeedle");
+  const trail=document.getElementById("macTrail");
+  const big=document.getElementById("macBig");
+  const lab=document.getElementById("macLab");
+
+  const pos=v=>Math.max(0,Math.min(100,v/MAC_SCALE_MAX*100));
+  safe.style.left=pos(SAFE[0])+"%";
+  safe.style.width=(pos(SAFE[1])-pos(SAFE[0]))+"%";
+  needle.style.left=`calc(${pos(res.mac)}% - 2px)`;
+  needle.className="mac-needle "+(res.okMac?"ok":"bad");
+  lab.textContent=`${res.mac.toFixed(1)}%`;
+  big.textContent=`${res.mac.toFixed(1)} %MAC`;
+  big.className="s "+(res.okMac?"ok":"bad");
+
+  if(state.trail.length>1){
+    const a=pos(state.trail[0]), b=pos(state.trail[state.trail.length-1]);
+    trail.style.display="block";
+    trail.style.left=Math.min(a,b)+"%";
+    trail.style.width=Math.max(2,Math.abs(b-a))+"%";
+  } else {
+    trail.style.display="none";
+  }
+}
+
+function drawRoll(ctx,res){
+  const W=1400,H=440;
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle="#dde3ea";
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+
+  const cx=W/2, cy=H/2+30;
+  const rollDeg=Math.max(-20,Math.min(20,res.cy*45));
+  const rad=rollDeg*Math.PI/180;
+
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.rotate(rad);
+
+  ctx.fillStyle="#e4eaf0"; ctx.strokeStyle="#8a9bb0"; ctx.lineWidth=2.5;
+  rr(ctx,-120,-44,240,88,26); ctx.fill(); ctx.stroke();
+
+  ctx.fillStyle="#d5e0ea";
+  ctx.fillRect(-32,-14,330,18); ctx.strokeRect(-32,-14,330,18);
+  ctx.fillRect(-298,-14,330,18); ctx.strokeRect(-298,-14,330,18);
+
+  ctx.fillStyle="#c5d0dc";
+  ctx.beginPath(); ctx.arc(110,22,24,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(-110,22,24,0,Math.PI*2); ctx.fill(); ctx.stroke();
+
+  ctx.fillStyle=FUEL.WING_L.color; ctx.fillRect(-220,-10,80,10);
+  ctx.fillStyle=FUEL.WING_R.color; ctx.fillRect(140,-10,80,10);
+
+  const px=res.cy*130;
+  const ok=res.okY;
+  ctx.strokeStyle=ok?"#1f8a4c":"#c0392b"; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.arc(0,0,14,0,Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(px,0); ctx.stroke();
+  ctx.fillStyle=ok?"#1f8a4c":"#c0392b";
+  ctx.beginPath(); ctx.arc(px,0,8,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle="#b0c0d0"; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(40,cy); ctx.lineTo(W-40,cy); ctx.stroke();
+
+  /* 顶部信息 — 分行 */
+  ctx.fillStyle="#1a2330";
+  ctx.font="700 18px Segoe UI,Microsoft YaHei,sans-serif";
+  ctx.fillText("横向重心与滚转示意",36,36);
+  ctx.font="700 20px Consolas,monospace";
+  ctx.fillStyle=ok?"#1f8a4c":"#c0392b";
+  ctx.fillText(`CGy ${res.cy>=0?"+":""}${res.cy.toFixed(2)} m`,36,64);
+  ctx.fillStyle="#4a5568";
+  ctx.font="13px Consolas,monospace";
+  ctx.fillText(`倾角示意 ${rollDeg.toFixed(1)}°  ·  左油差 ${fmt(res.fuelImb)} kg / 限 ${FUEL_IMB_LIM}`,36,88);
+  ctx.fillText(`左侧载荷 ${fmt(res.leftW)} kg  ·  右侧载荷 ${fmt(res.rightW)} kg`,36,108);
+
+  const maxW=Math.max(res.leftW,res.rightW,1);
+  const bh=90;
+  const lH=res.leftW/maxW*bh, rH=res.rightW/maxW*bh;
+  ctx.fillStyle="#2f7eb8";
+  ctx.fillRect(100,H-30-lH,56,lH);
+  ctx.fillStyle="#c44d82";
+  ctx.fillRect(W-156,H-30-rH,56,rH);
+  ctx.fillStyle="#4a5568";
+  ctx.font="700 12px Segoe UI,Microsoft YaHei,sans-serif";
+  ctx.fillText("左侧",108,H-12);
+  ctx.fillText("右侧",W-148,H-12);
+
+  document.getElementById("rollNote").textContent=
+    `姿态：${res.roll}  ·  判定：${res.okY&&res.okFuel?"横向合格":"横向/油差超限"}  ·  教学限 |y|≤${Y_LIM} m，油差≤${FUEL_IMB_LIM} kg`;
+}
+
+function drawWStack(res){
+  const c=document.getElementById("wstack");
+  const ctx=c.getContext("2d");
+  const W=c.width,H=c.height;
+  ctx.clearRect(0,0,W,H);
+
+  const parts=[{label:"OEW",w:OEW,color:"#7a8694"}];
+  for(const z of Object.keys(ZONES)){
+    const pw=state.pax[z]*PAX_W, bw=state.pax[z]*BAG_W;
+    if(pw) parts.push({label:ZONES[z].label,w:pw,color:ZONES[z].color});
+    if(bw) parts.push({label:"行李",w:bw,color:"#a89078"});
+  }
+  for(const k of Object.keys(CARGO)) if(state.cargo[k]) parts.push({label:CARGO[k].label,w:state.cargo[k],color:CARGO[k].color});
+  for(const f of Object.keys(FUEL)) if(state.fuel[f]) parts.push({label:FUEL[f].label,w:state.fuel[f],color:FUEL[f].color});
+
+  const tot=parts.reduce((s,p)=>s+p.w,0)||1;
+  ctx.fillStyle="#1a2330";
+  ctx.font="700 16px Segoe UI,Microsoft YaHei,sans-serif";
+  ctx.fillText(`TOW ${fmt(res.tow)} kg`,20,28);
+  ctx.font="13px Consolas,monospace";
+  ctx.fillStyle="#4a5568";
+  ctx.fillText(`MTOW ${fmt(MAX_TOW)}  ·  余量 ${fmt(MAX_TOW-res.tow)} kg`,20,50);
+
+  let x=20; const y=70, bw=W-40, bh=52;
+  parts.forEach(p=>{
+    const w=p.w/tot*bw;
+    ctx.fillStyle=p.color;
+    ctx.fillRect(x,y,w,bh);
+    ctx.strokeStyle="#fff"; ctx.lineWidth=1;
+    ctx.strokeRect(x,y,w,bh);
+    if(w>40){
+      ctx.fillStyle="#fff";
+      ctx.font="700 11px Segoe UI,Microsoft YaHei,sans-serif";
+      ctx.save();
+      ctx.translate(x+w/2,y+bh/2+4);
+      ctx.textAlign="center";
+      ctx.fillText(p.label.slice(0,4),0,0);
+      ctx.restore();
+    }
+    x+=w;
+  });
+
+  const ratio=res.tow/MAX_TOW;
+  ctx.fillStyle="#e4eaf0";
+  ctx.fillRect(20,y+bh+28,bw,16);
+  ctx.fillStyle=ratio>1?"#c0392b":ratio>0.92?"#b07800":"#1f8a4c";
+  ctx.fillRect(20,y+bh+28,bw*Math.min(1,ratio),16);
+  ctx.strokeStyle="#c5ccd4"; ctx.strokeRect(20,y+bh+28,bw,16);
+  ctx.fillStyle="#4a5568";
+  ctx.font="12px Consolas,monospace";
+  ctx.fillText(`MTOW 占用 ${(ratio*100).toFixed(1)}%`,20,y+bh+62);
+
+  /* 图例两列 */
+  ctx.font="12px Segoe UI,Microsoft YaHei,sans-serif";
+  let ly=y+bh+84, lx=20;
+  parts.forEach((p,i)=>{
+    if(i%4===0&&i>0){ly+=22;lx=20}
+    ctx.fillStyle=p.color;
+    ctx.fillRect(lx,ly-10,14,10);
+    ctx.fillStyle="#4a5568";
+    ctx.fillText(`${p.label} ${fmt(p.w)}`,lx+20,ly-1);
+    lx+=Math.floor((W-40)/4);
+  });
+}
+
+function render(fromSlider){
+  const r=compute();
+
+  const last=state.trail[state.trail.length-1];
+  if(!fromSlider) state.trail=[r.mac];
+  else if(last===undefined||Math.abs(last-r.mac)>0.01){
+    state.trail.push(r.mac);
+    if(state.trail.length>20) state.trail.shift();
+  }
+
+  kpi("kTow",`${fmt(r.tow)}<span class="u">kg</span>`, r.okTow?"ok":"bad");
+  kpi("kMom",`${fmt(r.mom)}`);
+  kpi("kCg",`${r.cg.toFixed(2)}<span class="u">m</span>`);
+  kpi("kMac",`${r.mac.toFixed(1)}<span class="u">%</span>`, r.okMac?"ok":"bad", r.pitch);
+  kpi("kZfw",`${fmt(r.zfw)}<span class="u">kg</span>`);
+  kpi("kPay",`${fmt(r.payload)}<span class="u">kg</span>`);
+
+  const st=document.getElementById("stPitch");
+  st.className="stat "+(r.okMac&&r.okTow?"ok":"bad");
+  document.getElementById("stFlag").textContent=r.okMac&&r.okTow?"NOMINAL 正常":"OUT OF LIMIT 超限";
+  document.getElementById("stPitchTxt").textContent=r.okMac
+    ? `俯仰包线内 · CG ${r.mac.toFixed(1)}% MAC · ${r.pitch}`
+    : (r.mac<SAFE[0]
+      ? `俯仰超前限：${r.mac.toFixed(1)}%（前限 ${SAFE[0]}%）· 建议减前舱旅客/前货，或增加后部油量`
+      : `俯仰超后限：${r.mac.toFixed(1)}%（后限 ${SAFE[1]}%）· 建议减后舱货，或增加前舱载荷`);
+
+  const allOk=r.okMac&&r.okY&&r.okFuel&&r.okTow;
+  document.getElementById("statDot").className="dot-stat"+(allOk?"":" bad");
+  document.getElementById("statTxt").textContent=allOk?"包线正常":"存在超限";
+
+  kpi("kY",`${r.cy>=0?"+":""}${r.cy.toFixed(2)}<span class="u">m</span>`, r.okY?"ok":"bad");
+  kpi("kImb",`${fmt(r.leftW-r.rightW)}<span class="u">kg</span>`);
+  kpi("kFuelImb",`${fmt(r.fuelImb)}<span class="u">kg</span>`, r.okFuel?"ok":"bad");
+  kpi("kRollM",`${(r.cy*1000).toFixed(0)}`);
+  kpi("kAil",Math.abs(r.cy)<0.05?"中立":(r.cy>0?"右压杆":"左压杆"), r.okY?"ok":"warn");
+  kpi("kYok",r.okY&&r.okFuel?"合格":"超限", r.okY&&r.okFuel?"ok":"bad");
+
+  document.getElementById("stRoll").className="stat "+(r.okY&&r.okFuel?"ok":"bad");
+  document.getElementById("stRollFlag").textContent=r.okY&&r.okFuel?"ROLL OK":"ROLL LIMIT";
+  document.getElementById("stRollTxt").textContent=r.okFuel
+    ? `横向 CG ${r.cy>=0?"+":""}${r.cy.toFixed(2)} m · ${r.roll}`
+    : `左右油差 ${fmt(r.fuelImb)} kg 超限 · 请先调平燃油`;
+
+  kpi("sW",`${fmt(r.tow)}<span class="u">kg</span>`, r.okTow?"ok":"bad");
+  kpi("sL",`${fmt(r.tow)}<span class="u">kg</span>`);
+  kpi("sFuel",`${fmt(r.fuel)}<span class="u">kg</span>`);
+  kpi("sPay",`${fmt(r.payload)}<span class="u">kg</span>`);
+  kpi("sPax",`${Object.values(state.pax).reduce((a,b)=>a+b,0)}<span class="u">人</span>`);
+  kpi("sMax",`${fmt(MAX_TOW-r.tow)}<span class="u">kg</span>`, r.tow>MAX_TOW?"bad":"ok");
+
+  document.getElementById("stStatic").className="stat "+(r.okTow?"ok":"bad");
+  document.getElementById("stSFlag").textContent=r.okTow?"W&B 正常":"超 MTOW";
+  document.getElementById("stStaticTxt").textContent=r.okTow
+    ? `静平衡：平飞时升力 L≈W = ${fmt(r.tow)} kg，未超过 MTOW ${fmt(MAX_TOW)} kg`
+    : `静平衡：超过 MTOW ${fmt(r.tow-MAX_TOW)} kg · 必须减载或减油`;
+
+  document.querySelector("#tbl tbody").innerHTML=r.items.map(i=>{
+    const cls=i.mac>=SAFE[0]&&i.mac<=SAFE[1]?"mac-ok":"mac-bad";
+    return `<tr>
+      <td><span class="sw" style="background:${i.color}"></span>${i.label}</td>
+      <td>${fmt(i.w)}</td>
+      <td>${i.st.toFixed(2)}</td>
+      <td>${fmt(i.m)}</td>
+      <td class="${cls}">${i.mac.toFixed(1)}</td>
+      <td>${i.y>=0?"+":""}${i.y.toFixed(2)}</td>
+    </tr>`;
+  }).join("");
+
+  document.getElementById("legPitch").innerHTML=
+    H_SLOTS.map(s=>`<span><i style="background:${s.color}"></i>${s.label}</span>`).join("")+
+    V_FUEL.map(s=>`<span><i style="background:${s.color}"></i>${s.label}</span>`).join("")+
+    `<span><i style="background:#1f8a4c"></i>CG 在包线内</span>`+
+    `<span><i style="background:#c0392b"></i>CG 超限</span>`+
+    `<span><i style="background:#b07800"></i>DATUM / 力臂</span>`;
+
+  drawPitch(document.getElementById("view").getContext("2d"), r);
+  drawMacBar(r);
+  drawRoll(document.getElementById("attitude").getContext("2d"), r);
+  drawWStack(r);
+}
+
+document.querySelectorAll(".tab").forEach(t=>{
+  t.onclick=()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));
+    t.classList.add("on");
+    document.querySelectorAll(".pane").forEach(p=>p.classList.remove("on"));
+    document.getElementById("pane-"+t.dataset.tab).classList.add("on");
+    render(false);
+  };
+});
+
+const PRESETS={
+  /* 极端工况均经 verify_a320_algorithm.py 验证可出包线 */
+  ok:{pax:{FWD:40,MID:60,AFT:35},cargo:{FWD:1800,AFT:2200,BULK:400},
+      fuel:{WING_L:4200,WING_R:4300,CTR:3500},cargoY:{FWD:0.10,AFT:-0.08,BULK:0.05}},
+  /* 前重 → %MAC≈6.8% < 18% */
+  fwd:{pax:{FWD:60,MID:0,AFT:0},cargo:{FWD:3175,AFT:0,BULK:0},
+       fuel:{WING_L:7500,WING_R:7500,CTR:0},cargoY:{FWD:0.10,AFT:0,BULK:0}},
+  /* 后重 → %MAC≈59.5% > 36% */
+  aft:{pax:{FWD:0,MID:0,AFT:50},cargo:{FWD:0,AFT:4480,BULK:1495},
+       fuel:{WING_L:0,WING_R:0,CTR:6145},cargoY:{FWD:0,AFT:-0.08,BULK:0.05}},
+  /* 左重 → 油差/横向 CG 出限 */
+  left:{pax:{FWD:20,MID:40,AFT:20},cargo:{FWD:2000,AFT:2000,BULK:500},
+        fuel:{WING_L:7400,WING_R:200,CTR:1500},cargoY:{FWD:-0.75,AFT:-0.75,BULK:-0.6}},
+  right:{pax:{FWD:20,MID:40,AFT:20},cargo:{FWD:2000,AFT:2000,BULK:500},
+         fuel:{WING_L:200,WING_R:7400,CTR:1500},cargoY:{FWD:0.75,AFT:0.75,BULK:0.6}},
+  empty:{pax:{FWD:0,MID:0,AFT:0},cargo:{FWD:0,AFT:0,BULK:0},
+         fuel:{WING_L:0,WING_R:0,CTR:0},cargoY:{FWD:0,AFT:0,BULK:0}},
+};
+
+document.querySelectorAll(".pbtn").forEach(btn=>{
+  btn.onclick=()=>{
+    const p=PRESETS[btn.dataset.p];
+    state.pax={...p.pax}; state.cargo={...p.cargo};
+    state.fuel={...p.fuel}; state.cargoY={...p.cargoY};
+    document.querySelectorAll(".pbtn").forEach(b=>b.classList.remove("on"));
+    btn.classList.add("on");
+    setTune();
+    render(false);
+  };
+});
+
+document.getElementById("ex0").onclick=()=>{
+  state.explode=0;
+  document.getElementById("ex0").classList.add("on");
+  document.getElementById("ex1").classList.remove("on");
+  render(true);
+};
+document.getElementById("ex1").onclick=()=>{
+  state.explode=1;
+  document.getElementById("ex1").classList.add("on");
+  document.getElementById("ex0").classList.remove("on");
+  render(true);
+};
+
+buildTune();
+render(false);
+</script>
+</body>
+</html>

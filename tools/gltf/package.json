@@ -1,0 +1,1 @@
+{"name":"local-vendor","private":true,"version":"1.0.0","dependencies":{"@gltf-transform/cli":"^4.5.0","esbuild":"^0.28.2"}}
